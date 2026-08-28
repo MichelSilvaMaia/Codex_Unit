@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: codex_unit
+      POSTGRES_USER: codex_unit
+      POSTGRES_PASSWORD: codex_unit
+    ports:
+      - "5432:5432"
+    volumes:
+      - codex_unit_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codex_unit -d codex_unit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  codex_unit_postgres:

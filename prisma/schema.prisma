@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+model User {
+  id            String             @id @default(uuid()) @db.Uuid
+  name          String?
+  email         String             @unique
+  emailVerified DateTime?
+  image         String?
+  status        UserStatus         @default(INVITED)
+  memberships   TenantMembership[]
+  auditLogs     AuditLog[]         @relation("AuditActor")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model Tenant {
+  id          String             @id @default(uuid()) @db.Uuid
+  legalName   String
+  tradeName   String
+  slug        String             @unique
+  status      TenantStatus       @default(ACTIVE)
+  memberships TenantMembership[]
+  auditLogs   AuditLog[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model TenantMembership {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  tenantId  String           @db.Uuid
+  status    MembershipStatus @default(INVITED)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, status])
+  @@index([userId, status])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, entityId])
+  @@index([actorUserId, createdAt])
+}
