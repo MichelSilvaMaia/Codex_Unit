@@ -11,6 +11,7 @@ enum UserStatus {
   ACTIVE
   INVITED
   SUSPENDED
+  INACTIVE
 }
 
 enum TenantStatus {
@@ -22,6 +23,24 @@ enum MembershipStatus {
   ACTIVE
   INVITED
   SUSPENDED
+  INACTIVE
+}
+
+enum RoleScope {
+  PLATFORM
+  TENANT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum AuditScope {
+  PLATFORM
+  TENANT
 }
 
 model User {
@@ -33,6 +52,10 @@ model User {
   status        UserStatus         @default(INVITED)
   memberships   TenantMembership[]
   auditLogs     AuditLog[]         @relation("AuditActor")
+  accounts      Account[]
+  credential    PasswordCredential?
+  passwordResetTokens PasswordResetToken[]
+  sentInvitations TenantInvitation[] @relation("InvitationSender")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 }
@@ -45,6 +68,8 @@ model Tenant {
   status      TenantStatus       @default(ACTIVE)
   memberships TenantMembership[]
   auditLogs   AuditLog[]
+  roles       Role[]
+  invitations TenantInvitation[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 }
@@ -56,6 +81,7 @@ model TenantMembership {
   status    MembershipStatus @default(INVITED)
   user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  roles     MembershipRole[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
@@ -66,17 +92,131 @@ model TenantMembership {
 
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
-  tenantId    String   @db.Uuid
+  scope       AuditScope @default(TENANT)
+  tenantId    String?  @db.Uuid
   actorUserId String?  @db.Uuid
   action      String
   entityType  String
   entityId    String
   metadata    Json?
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
 
   @@index([tenantId, createdAt])
   @@index([tenantId, entityType, entityId])
   @@index([actorUserId, createdAt])
+}
+
+model PasswordCredential {
+  userId       String   @id @db.Uuid
+  passwordHash String
+  changedAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String?          @db.Uuid
+  scope       RoleScope        @default(TENANT)
+  name        String
+  code        String
+  description String?
+  isSystem    Boolean          @default(false)
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  memberships MembershipRole[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, scope])
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  description String
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model MembershipRole {
+  membershipId String           @db.Uuid
+  roleId       String           @db.Uuid
+  membership   TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role         Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@id([membershipId, roleId])
+  @@index([roleId])
+}
+
+model TenantInvitation {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @db.Uuid
+  email           String
+  tokenHash       String           @unique
+  status          InvitationStatus @default(PENDING)
+  expiresAt       DateTime
+  invitedByUserId String           @db.Uuid
+  acceptedAt      DateTime?
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy       User             @relation("InvitationSender", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime         @default(now())
+
+  @@index([tenantId, email, status])
+  @@index([expiresAt, status])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt, usedAt])
 }
