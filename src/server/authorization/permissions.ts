@@ -11,15 +11,46 @@ export const PERMISSIONS = [
   "roles.manage",
   "memberships.view",
   "memberships.manage",
+  "units.view",
+  "units.create",
+  "units.update",
+  "units.disable",
+  "customers.view",
+  "customers.create",
+  "customers.update",
+  "customers.disable",
+  "contracts.view",
+  "contracts.create",
+  "contracts.update",
+  "contracts.disable",
+  "resources.view",
+  "resources.create",
+  "resources.update",
+  "resources.disable",
+  "resource_categories.view",
+  "resource_categories.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
 export const INITIAL_ROLE_MATRIX: Record<"tenant-admin" | "manager" | "supervisor" | "operator", readonly Permission[]> = {
   "tenant-admin": PERMISSIONS,
-  manager: ["tenant.view", "users.view", "memberships.view"],
-  supervisor: ["tenant.view", "users.view"],
-  operator: ["tenant.view"],
+  manager: [
+    "tenant.view", "users.view", "memberships.view",
+    "units.view", "units.create", "units.update",
+    "customers.view", "customers.create", "customers.update",
+    "contracts.view", "contracts.create", "contracts.update",
+    "resources.view", "resources.create", "resources.update",
+    "resource_categories.view", "resource_categories.manage",
+  ],
+  supervisor: [
+    "tenant.view", "users.view", "units.view", "customers.view",
+    "contracts.view", "resources.view", "resources.update", "resource_categories.view",
+  ],
+  operator: [
+    "tenant.view", "units.view", "customers.view", "contracts.view",
+    "resources.view", "resource_categories.view",
+  ],
 };
 
 export function hasPermission(granted: ReadonlySet<string>, required: Permission) {

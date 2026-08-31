@@ -2,6 +2,11 @@
 
 Fundação técnica de um SaaS multiempresa para gestão de reservas e locações. A Fase 2 adiciona identidade real, seleção segura de empresa e RBAC; funcionalidades comerciais e operacionais ainda não fazem parte do projeto.
 
+## Status das fases
+
+- Fase 2: **PARCIAL** até a execução real de migration → seed → autenticação → isolamento de tenant em PostgreSQL.
+- Fase 3: domínio operacional de unidades, clientes, contratos, categorias e recursos individualizados. A validação integrada também depende do PostgreSQL real.
+
 ## Requisitos
 
 - Node.js 20.9 ou superior
@@ -50,7 +55,7 @@ O seed cria permissões, os papéis Tenant Admin, Manager, Supervisor e Operator
 pnpm dev
 ```
 
-Rotas de identidade: `/login`, `/select-tenant`, `/account`, `/users`, `/roles` e `/api/auth/*`. `/dashboard` exige sessão e empresa ativa.
+Rotas de identidade: `/login`, `/select-tenant`, `/account`, `/users`, `/roles` e `/api/auth/*`. Rotas operacionais: `/units`, `/customers`, `/customers/[id]`, `/contracts` e `/resources`. `/dashboard` e toda rota operacional exigem sessão e empresa ativa.
 
 O login por e-mail e senha exige usuário ativo e credencial com hash bcrypt. Google e Microsoft são opcionais e só aceitam contas previamente cadastradas e ativas; o primeiro login social não cria acesso automático. Depois do login, uma única membership ativa é selecionada automaticamente, enquanto múltiplas empresas levam ao seletor. A empresa ativa fica em cookie assinado, `HttpOnly`, com validade curta, e sempre é revalidada no servidor.
 
@@ -86,3 +91,7 @@ docs/adr/            decisões arquiteturais
 - Arquivos ficam atrás da interface `StorageProvider`.
 - Erros públicos não expõem stack traces.
 - Alterações de schema são feitas apenas por migrations versionadas.
+
+## Disponibilidade futura
+
+`Resource.status` é administrativo e `Resource.operationalStatus` representa condições como manutenção ou indisponibilidade física. Não existe status `RESERVED`: disponibilidade de reserva é temporal. A Fase 4 deverá introduzir `Reservation`, `ReservationItem`, intervalos, prevenção de sobreposição e concorrência transacional sem transformar o cadastro do ativo em fonte definitiva de disponibilidade.

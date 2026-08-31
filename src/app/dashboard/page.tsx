@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   ];
   return (
     <main className="min-h-screen bg-muted">
-      <AppHeader tenantName={context.tenantName} />
+      <AppHeader tenantName={context.tenantName} permissions={context.permissions} />
       <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
         <p className="text-sm font-medium text-primary">Ambiente seguro</p>
         <h1 className="mt-2 font-[var(--font-heading)] text-3xl font-bold">Olá, {context.user.name ?? context.user.email}</h1>

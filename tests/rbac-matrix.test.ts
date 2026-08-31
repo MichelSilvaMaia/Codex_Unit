@@ -21,4 +21,17 @@ describe("initial RBAC matrix", () => {
     expect(hasPermission(granted, "users.view")).toBe(false);
     expect(hasPermission(granted, "users.update")).toBe(false);
   });
+
+  it("allows tenant admin all phase 3 capabilities", () => {
+    const granted = new Set<string>(INITIAL_ROLE_MATRIX["tenant-admin"]);
+    for (const permission of ["units.disable", "customers.disable", "contracts.disable", "resources.disable", "resource_categories.manage"] as const) {
+      expect(hasPermission(granted, permission)).toBe(true);
+    }
+  });
+
+  it("allows manager and denies operator customer creation", () => {
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.manager), "customers.create")).toBe(true);
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.manager), "customers.disable")).toBe(false);
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.operator), "customers.create")).toBe(false);
+  });
 });
