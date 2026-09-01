@@ -39,6 +39,10 @@ const permissionDescriptions: Record<(typeof PERMISSIONS)[number], string> = {
   "reservations.update": "Atualizar reservas",
   "reservations.cancel": "Cancelar reservas",
   "reservations.confirm": "Confirmar reservas",
+  "reservations.submit": "Enviar reservas para aprovação",
+  "reservations.approve": "Aprovar reservas",
+  "reservations.reject": "Reprovar reservas",
+  "reservations.mark_urgent": "Marcar reservas como urgentes",
 };
 
 async function main() {

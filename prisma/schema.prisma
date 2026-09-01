@@ -78,9 +78,16 @@ enum ResourceOperationalStatus {
 
 enum ReservationStatus {
   DRAFT
-  PENDING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
   CONFIRMED
   CANCELLED
+}
+
+enum ReservationDecision {
+  APPROVED
+  REJECTED
 }
 
 model User {
@@ -99,6 +106,10 @@ model User {
   createdReservations      Reservation[]              @relation("ReservationCreator")
   cancelledReservations    Reservation[]              @relation("ReservationCanceller")
   reservationStatusHistory ReservationStatusHistory[] @relation("ReservationStatusActor")
+  submittedReservations    Reservation[]              @relation("ReservationSubmitter")
+  approvedReservations     Reservation[]              @relation("ReservationApprover")
+  rejectedReservations     Reservation[]              @relation("ReservationRejecter")
+  reservationDecisions     ReservationApproval[]      @relation("ReservationDecisionActor")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 }
@@ -124,6 +135,7 @@ model Tenant {
   reservations             Reservation[]
   reservationItems         ReservationItem[]
   reservationStatusHistory ReservationStatusHistory[]
+  reservationApprovals     ReservationApproval[]
   timeZone                 String                     @default("America/Sao_Paulo")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
@@ -315,6 +327,15 @@ model Reservation {
   endAt              DateTime                   @db.Timestamptz(3)
   status             ReservationStatus          @default(DRAFT)
   createdByUserId    String                     @db.Uuid
+  isUrgent           Boolean                    @default(false)
+  urgentReason       String?
+  submittedAt        DateTime?                  @db.Timestamptz(3)
+  submittedByUserId  String?                    @db.Uuid
+  approvedAt         DateTime?                  @db.Timestamptz(3)
+  approvedByUserId   String?                    @db.Uuid
+  rejectedAt         DateTime?                  @db.Timestamptz(3)
+  rejectedByUserId   String?                    @db.Uuid
+  rejectionReason    String?
   cancelledAt        DateTime?                  @db.Timestamptz(3)
   cancelledByUserId  String?                    @db.Uuid
   cancellationReason String?
@@ -323,9 +344,13 @@ model Reservation {
   contract           Contract?                  @relation(fields: [tenantId, contractId], references: [tenantId, id], onDelete: Restrict)
   unit               Unit                       @relation(fields: [tenantId, unitId], references: [tenantId, id], onDelete: Restrict)
   createdBy          User                       @relation("ReservationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  submittedBy        User?                      @relation("ReservationSubmitter", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  approvedBy         User?                      @relation("ReservationApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  rejectedBy         User?                      @relation("ReservationRejecter", fields: [rejectedByUserId], references: [id], onDelete: Restrict)
   cancelledBy        User?                      @relation("ReservationCanceller", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
   items              ReservationItem[]
   statusHistory      ReservationStatusHistory[]
+  approvals          ReservationApproval[]
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
@@ -337,6 +362,22 @@ model Reservation {
   @@index([tenantId, customerId])
   @@index([tenantId, contractId])
   @@index([tenantId, unitId])
+}
+
+model ReservationApproval {
+  id              String              @id @default(uuid()) @db.Uuid
+  tenantId        String              @db.Uuid
+  reservationId   String              @db.Uuid
+  decision        ReservationDecision
+  decidedByUserId String              @db.Uuid
+  reason          String?
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reservation     Reservation         @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Cascade)
+  decidedBy       User                @relation("ReservationDecisionActor", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime            @default(now())
+
+  @@index([tenantId, reservationId, createdAt])
+  @@index([decidedByUserId, createdAt])
 }
 
 model ReservationItem {

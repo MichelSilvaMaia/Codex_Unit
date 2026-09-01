@@ -95,4 +95,4 @@ docs/adr/            decisões arquiteturais
 
 ## Disponibilidade futura
 
-`Resource.status` é administrativo e `Resource.operationalStatus` representa condições como manutenção ou indisponibilidade física. Não existe status `RESERVED`: disponibilidade é calculada pelos intervalos de `ReservationItem`. O PostgreSQL impede sobreposição concorrente de itens `PENDING` ou `CONFIRMED` por exclusion constraint GiST.
+`Resource.status` é administrativo e `Resource.operationalStatus` representa condições como manutenção ou indisponibilidade física. Não existe status `RESERVED`: disponibilidade é calculada pelos intervalos de `ReservationItem`. O PostgreSQL impede sobreposição concorrente de itens `PENDING_APPROVAL`, `APPROVED` ou `CONFIRMED` por exclusion constraint GiST. Reservas urgentes mantêm as mesmas garantias e exigem justificativa.

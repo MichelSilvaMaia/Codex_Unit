@@ -20,3 +20,7 @@ A migration incremental e o seed operacional foram executados. O teste integrado
 ## Fase 4 — VALIDADA EM POSTGRESQL
 
 Reservas usam proteção PostgreSQL por exclusion constraint. O teste concorrente real comprovou que, entre duas transações simultâneas conflitantes, apenas uma vence e a outra recebe conflito controlado.
+
+## Fase 5 — VALIDADA EM POSTGRESQL
+
+O workflow de aprovação, autoaprovação explícita do gerente, reprovação motivada e urgência auditável foram implementados. A predicate GiST foi migrada para `PENDING_APPROVAL`, `APPROVED` e `CONFIRMED`. Testes reais comprovam exclusão temporal e decisão concorrente `approve × reject` com apenas um vencedor.

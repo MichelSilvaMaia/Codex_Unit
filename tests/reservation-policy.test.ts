@@ -21,9 +21,11 @@ describe("semi-open reservation intervals", () => {
 });
 
 describe("reservation status policy", () => {
-  it("blocks only pending and confirmed reservations", () => {
+  it("blocks approval workflow states consistently", () => {
     expect(reservationBlocksAvailability("DRAFT")).toBe(false);
-    expect(reservationBlocksAvailability("PENDING")).toBe(true);
+    expect(reservationBlocksAvailability("PENDING_APPROVAL")).toBe(true);
+    expect(reservationBlocksAvailability("APPROVED")).toBe(true);
+    expect(reservationBlocksAvailability("REJECTED")).toBe(false);
     expect(reservationBlocksAvailability("CONFIRMED")).toBe(true);
     expect(reservationBlocksAvailability("CANCELLED")).toBe(false);
   });
@@ -33,9 +35,18 @@ describe("reservation status policy", () => {
   });
 
   it("allows the initial state transitions", () => {
-    expect(() => requireReservationTransition("DRAFT", "PENDING")).not.toThrow();
-    expect(() => requireReservationTransition("PENDING", "CONFIRMED")).not.toThrow();
+    expect(() => requireReservationTransition("DRAFT", "PENDING_APPROVAL")).not.toThrow();
+    expect(() => requireReservationTransition("PENDING_APPROVAL", "APPROVED")).not.toThrow();
+    expect(() => requireReservationTransition("PENDING_APPROVAL", "REJECTED")).not.toThrow();
+    expect(() => requireReservationTransition("REJECTED", "DRAFT")).not.toThrow();
+    expect(() => requireReservationTransition("APPROVED", "CONFIRMED")).not.toThrow();
     expect(() => requireReservationTransition("CONFIRMED", "CANCELLED")).not.toThrow();
+  });
+
+  it("rejects unsafe approval transitions", () => {
+    expect(() => requireReservationTransition("APPROVED", "REJECTED")).toThrow();
+    expect(() => requireReservationTransition("CANCELLED", "APPROVED")).toThrow();
+    expect(() => requireReservationTransition("CONFIRMED", "DRAFT")).toThrow();
   });
 });
 

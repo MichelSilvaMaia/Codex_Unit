@@ -1,11 +1,13 @@
 import type { ReservationStatus } from "@prisma/client";
 import { AppError } from "@/server/errors/app-error";
 
-export const BLOCKING_RESERVATION_STATUSES = new Set<ReservationStatus>(["PENDING", "CONFIRMED"]);
+export const BLOCKING_RESERVATION_STATUSES = new Set<ReservationStatus>(["PENDING_APPROVAL", "APPROVED", "CONFIRMED"]);
 
 export const RESERVATION_TRANSITIONS: Record<ReservationStatus, readonly ReservationStatus[]> = {
-  DRAFT: ["PENDING", "CANCELLED"],
-  PENDING: ["CONFIRMED", "CANCELLED"],
+  DRAFT: ["PENDING_APPROVAL", "CANCELLED"],
+  PENDING_APPROVAL: ["APPROVED", "REJECTED", "CANCELLED"],
+  APPROVED: ["CONFIRMED", "CANCELLED"],
+  REJECTED: ["DRAFT"],
   CONFIRMED: ["CANCELLED"],
   CANCELLED: [],
 };

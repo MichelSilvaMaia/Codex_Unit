@@ -76,5 +76,10 @@ export function reservationAudit(context: OperationalContext, action: string, re
 }
 
 export function transitionPermission(status: ReservationStatus) {
-  return status === "CONFIRMED" ? "reservations.confirm" as const : status === "CANCELLED" ? "reservations.cancel" as const : "reservations.update" as const;
+  if (status === "PENDING_APPROVAL") return "reservations.submit" as const;
+  if (status === "APPROVED") return "reservations.approve" as const;
+  if (status === "REJECTED") return "reservations.reject" as const;
+  if (status === "CONFIRMED") return "reservations.confirm" as const;
+  if (status === "CANCELLED") return "reservations.cancel" as const;
+  return "reservations.update" as const;
 }

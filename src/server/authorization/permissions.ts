@@ -34,6 +34,10 @@ export const PERMISSIONS = [
   "reservations.update",
   "reservations.cancel",
   "reservations.confirm",
+  "reservations.submit",
+  "reservations.approve",
+  "reservations.reject",
+  "reservations.mark_urgent",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -47,17 +51,17 @@ export const INITIAL_ROLE_MATRIX: Record<"tenant-admin" | "manager" | "superviso
     "contracts.view", "contracts.create", "contracts.update",
     "resources.view", "resources.create", "resources.update",
     "resource_categories.view", "resource_categories.manage",
-    "reservations.view", "reservations.create", "reservations.update", "reservations.cancel", "reservations.confirm",
+    "reservations.view", "reservations.create", "reservations.update", "reservations.cancel", "reservations.confirm", "reservations.submit", "reservations.approve", "reservations.reject", "reservations.mark_urgent",
   ],
   supervisor: [
     "tenant.view", "users.view", "units.view", "customers.view",
     "contracts.view", "resources.view", "resources.update", "resource_categories.view",
-    "reservations.view", "reservations.create", "reservations.update",
+    "reservations.view", "reservations.create", "reservations.update", "reservations.submit", "reservations.mark_urgent",
   ],
   operator: [
     "tenant.view", "units.view", "customers.view", "contracts.view",
     "resources.view", "resource_categories.view",
-    "reservations.view", "reservations.create",
+    "reservations.view", "reservations.create", "reservations.update", "reservations.submit",
   ],
 };
 
