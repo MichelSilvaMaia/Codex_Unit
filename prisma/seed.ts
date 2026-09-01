@@ -43,6 +43,13 @@ const permissionDescriptions: Record<(typeof PERMISSIONS)[number], string> = {
   "reservations.approve": "Aprovar reservas",
   "reservations.reject": "Reprovar reservas",
   "reservations.mark_urgent": "Marcar reservas como urgentes",
+  "pickups.view": "Visualizar fila e tentativas de retirada",
+  "pickups.start": "Iniciar retirada",
+  "pickups.inspect": "Conferir itens da retirada",
+  "pickups.complete": "Concluir retirada",
+  "pickups.refuse": "Recusar retirada",
+  "pickups.view_evidence": "Visualizar evidências operacionais",
+  "pickups.add_evidence": "Adicionar evidências operacionais",
 };
 
 async function main() {
@@ -91,7 +98,7 @@ async function main() {
     permissions.set(code, permission.id);
   }
 
-  const roleNames = { "tenant-admin": "Tenant Admin", manager: "Manager", supervisor: "Supervisor", operator: "Operator" } as const;
+  const roleNames = { "tenant-admin": "Tenant Admin", manager: "Manager", supervisor: "Supervisor", operator: "Operator", "gate-operator": "Portaria" } as const;
   for (const [code, permissionCodes] of Object.entries(INITIAL_ROLE_MATRIX)) {
     const role = await prisma.role.upsert({
       where: { tenantId_code: { tenantId: tenant.id, code } },

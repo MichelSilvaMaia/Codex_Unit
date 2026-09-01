@@ -3,6 +3,7 @@ node_modules/
 out/
 coverage/
 .env
+.data/
 .env.*
 !.env.example
 *.log

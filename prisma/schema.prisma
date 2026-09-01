@@ -71,6 +71,7 @@ enum ContractStatus {
 
 enum ResourceOperationalStatus {
   AVAILABLE
+  IN_USE
   MAINTENANCE
   UNAVAILABLE
   RETIRED
@@ -82,7 +83,49 @@ enum ReservationStatus {
   APPROVED
   REJECTED
   CONFIRMED
+  READY_FOR_PICKUP
+  RELEASED
   CANCELLED
+}
+
+enum PickupStatus {
+  IN_PROGRESS
+  COMPLETED
+  REFUSED
+  CANCELLED
+}
+
+enum PickupItemStatus {
+  PENDING
+  RELEASED
+  REFUSED
+}
+
+enum ResourceCondition {
+  OK
+  DAMAGED
+  DIVERGENT
+  OTHER
+}
+
+enum PickupRefusalReason {
+  DAMAGE
+  RESOURCE_MISMATCH
+  DOCUMENT_MISMATCH
+  RECIPIENT_MISMATCH
+  RESERVATION_INVALID
+  OTHER
+}
+
+enum EvidenceType {
+  DAMAGE
+  DIVERGENCE
+  RESOURCE_IDENTIFICATION
+  OUTPUT_CONDITION
+}
+
+enum CustodyEventType {
+  RELEASED_TO_RECIPIENT
 }
 
 enum ReservationDecision {
@@ -110,6 +153,10 @@ model User {
   approvedReservations     Reservation[]              @relation("ReservationApprover")
   rejectedReservations     Reservation[]              @relation("ReservationRejecter")
   reservationDecisions     ReservationApproval[]      @relation("ReservationDecisionActor")
+  processedPickups         ReservationPickup[]        @relation("PickupProcessor")
+  checkedPickupItems       ReservationPickupItem[]    @relation("PickupItemChecker")
+  uploadedEvidence         OperationalEvidence[]      @relation("EvidenceUploader")
+  custodyEvents            ResourceCustodyEvent[]     @relation("CustodyActor")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 }
@@ -136,6 +183,10 @@ model Tenant {
   reservationItems         ReservationItem[]
   reservationStatusHistory ReservationStatusHistory[]
   reservationApprovals     ReservationApproval[]
+  pickups                  ReservationPickup[]
+  pickupItems              ReservationPickupItem[]
+  operationalEvidence      OperationalEvidence[]
+  custodyEvents            ResourceCustodyEvent[]
   timeZone                 String                     @default("America/Sao_Paulo")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
@@ -304,6 +355,8 @@ model Resource {
   unit              Unit                      @relation(fields: [tenantId, unitId], references: [tenantId, id], onDelete: Restrict)
   category          ResourceCategory          @relation(fields: [tenantId, categoryId], references: [tenantId, id], onDelete: Restrict)
   reservationItems  ReservationItem[]
+  pickupItems       ReservationPickupItem[]
+  custodyEvents     ResourceCustodyEvent[]
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
 
@@ -351,6 +404,8 @@ model Reservation {
   items              ReservationItem[]
   statusHistory      ReservationStatusHistory[]
   approvals          ReservationApproval[]
+  pickups            ReservationPickup[]
+  custodyEvents      ResourceCustodyEvent[]
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
@@ -381,22 +436,121 @@ model ReservationApproval {
 }
 
 model ReservationItem {
-  id            String            @id @default(uuid()) @db.Uuid
-  tenantId      String            @db.Uuid
-  reservationId String            @db.Uuid
-  resourceId    String            @db.Uuid
-  startAt       DateTime          @db.Timestamptz(3)
-  endAt         DateTime          @db.Timestamptz(3)
+  id            String                  @id @default(uuid()) @db.Uuid
+  tenantId      String                  @db.Uuid
+  reservationId String                  @db.Uuid
+  resourceId    String                  @db.Uuid
+  startAt       DateTime                @db.Timestamptz(3)
+  endAt         DateTime                @db.Timestamptz(3)
   status        ReservationStatus
-  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  reservation   Reservation       @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Cascade)
-  resource      Resource          @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reservation   Reservation             @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Cascade)
+  resource      Resource                @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
+  pickupItems   ReservationPickupItem[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
   @@unique([reservationId, resourceId])
   @@index([tenantId, reservationId])
   @@index([tenantId, resourceId, startAt, endAt])
+}
+
+model ReservationPickup {
+  id                String                  @id @default(uuid()) @db.Uuid
+  tenantId          String                  @db.Uuid
+  reservationId     String                  @db.Uuid
+  status            PickupStatus            @default(IN_PROGRESS)
+  startedAt         DateTime                @default(now()) @db.Timestamptz(3)
+  completedAt       DateTime?               @db.Timestamptz(3)
+  refusedAt         DateTime?               @db.Timestamptz(3)
+  processedByUserId String                  @db.Uuid
+  recipientName     String
+  recipientDocument String?
+  recipientPhone    String?
+  vehiclePlate      String?
+  notes             String?
+  refusalReasonCode PickupRefusalReason?
+  refusalNotes      String?
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reservation       Reservation             @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Restrict)
+  processedBy       User                    @relation("PickupProcessor", fields: [processedByUserId], references: [id], onDelete: Restrict)
+  items             ReservationPickupItem[]
+  evidence          OperationalEvidence[]
+  custodyEvents     ResourceCustodyEvent[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, reservationId, createdAt])
+}
+
+model ReservationPickupItem {
+  id                String                @id @default(uuid()) @db.Uuid
+  tenantId          String                @db.Uuid
+  pickupId          String                @db.Uuid
+  reservationItemId String                @db.Uuid
+  resourceId        String                @db.Uuid
+  status            PickupItemStatus      @default(PENDING)
+  condition         ResourceCondition     @default(OK)
+  notes             String?
+  checkedAt         DateTime?             @db.Timestamptz(3)
+  checkedByUserId   String?               @db.Uuid
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  pickup            ReservationPickup     @relation(fields: [tenantId, pickupId], references: [tenantId, id], onDelete: Cascade)
+  reservationItem   ReservationItem       @relation(fields: [reservationItemId], references: [id], onDelete: Restrict)
+  resource          Resource              @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
+  checkedBy         User?                 @relation("PickupItemChecker", fields: [checkedByUserId], references: [id], onDelete: Restrict)
+  evidence          OperationalEvidence[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([pickupId, reservationItemId])
+  @@unique([tenantId, id])
+  @@index([tenantId, pickupId])
+  @@index([tenantId, resourceId])
+}
+
+model OperationalEvidence {
+  id               String                 @id @default(uuid()) @db.Uuid
+  tenantId         String                 @db.Uuid
+  pickupId         String                 @db.Uuid
+  pickupItemId     String?                @db.Uuid
+  type             EvidenceType
+  storageKey       String                 @unique
+  mimeType         String
+  size             Int
+  checksum         String
+  uploadedByUserId String                 @db.Uuid
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  pickup           ReservationPickup      @relation(fields: [tenantId, pickupId], references: [tenantId, id], onDelete: Cascade)
+  pickupItem       ReservationPickupItem? @relation(fields: [tenantId, pickupItemId], references: [tenantId, id], onDelete: Cascade)
+  uploadedBy       User                   @relation("EvidenceUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime               @default(now())
+
+  @@index([tenantId, pickupId, createdAt])
+}
+
+model ResourceCustodyEvent {
+  id            String            @id @default(uuid()) @db.Uuid
+  tenantId      String            @db.Uuid
+  resourceId    String            @db.Uuid
+  reservationId String            @db.Uuid
+  pickupId      String            @db.Uuid
+  type          CustodyEventType
+  fromParty     String
+  toParty       String
+  actorUserId   String            @db.Uuid
+  occurredAt    DateTime          @default(now()) @db.Timestamptz(3)
+  metadata      Json?
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  resource      Resource          @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
+  reservation   Reservation       @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Restrict)
+  pickup        ReservationPickup @relation(fields: [tenantId, pickupId], references: [tenantId, id], onDelete: Restrict)
+  actor         User              @relation("CustodyActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, resourceId, occurredAt])
+  @@index([tenantId, reservationId])
 }
 
 model ReservationStatusHistory {

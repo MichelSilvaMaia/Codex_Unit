@@ -10,6 +10,7 @@ export function AppHeader({ tenantName, permissions = new Set<string>() }: { ten
     { href: "/contracts", label: "Contratos", permission: "contracts.view" },
     { href: "/resources", label: "Recursos", permission: "resources.view" },
     { href: "/reservations", label: "Reservas", permission: "reservations.view" },
+    { href: "/pickups", label: "Portaria", permission: "pickups.view" },
   ];
   return (
     <header className="border-b bg-background px-5 py-4 sm:px-8">
