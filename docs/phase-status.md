@@ -1,17 +1,22 @@
 # Estado de validação das fases
 
-## Fase 2 — PARCIAL
+## Fase 2 — VALIDADA EM POSTGRESQL
 
-A implementação funcional existe, mas continuam pendentes em PostgreSQL real:
+A cadeia real foi executada em PostgreSQL 17.11:
 
-- migration;
-- seed;
-- autenticação por senha e provedores;
-- seleção e isolamento de tenant;
-- integração completa de RBAC.
+- migrations aplicadas;
+- seed executado;
+- hash de senha validado;
+- membership e tenant ativos consultados;
+- permissões carregadas do RBAC;
+- isolamento cross-tenant comprovado contra o banco.
 
-Testes unitários e build não substituem esta cadeia integrada.
+OAuth externo continua dependendo das credenciais dos respectivos provedores, sem afetar a validação da identidade local.
 
-## Fase 3
+## Fase 3 — VALIDADA EM POSTGRESQL
 
-A execução real da migration incremental, seed atualizado e testes de integração do domínio operacional dependem da mesma disponibilidade de PostgreSQL.
+A migration incremental e o seed operacional foram executados. O teste integrado confirmou isolamento real de Customer entre tenants.
+
+## Fase 4 — VALIDADA EM POSTGRESQL
+
+Reservas usam proteção PostgreSQL por exclusion constraint. O teste concorrente real comprovou que, entre duas transações simultâneas conflitantes, apenas uma vence e a outra recebe conflito controlado.

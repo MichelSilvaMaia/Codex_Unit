@@ -34,4 +34,11 @@ describe("initial RBAC matrix", () => {
     expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.manager), "customers.disable")).toBe(false);
     expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.operator), "customers.create")).toBe(false);
   });
+
+  it("assigns reservation permissions without granting operator confirmation", () => {
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.manager), "reservations.confirm")).toBe(true);
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.supervisor), "reservations.update")).toBe(true);
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.operator), "reservations.create")).toBe(true);
+    expect(hasPermission(new Set(INITIAL_ROLE_MATRIX.operator), "reservations.confirm")).toBe(false);
+  });
 });

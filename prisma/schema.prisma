@@ -76,43 +76,57 @@ enum ResourceOperationalStatus {
   RETIRED
 }
 
+enum ReservationStatus {
+  DRAFT
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
 model User {
-  id                  String               @id @default(uuid()) @db.Uuid
-  name                String?
-  email               String               @unique
-  emailVerified       DateTime?
-  image               String?
-  status              UserStatus           @default(INVITED)
-  memberships         TenantMembership[]
-  auditLogs           AuditLog[]           @relation("AuditActor")
-  accounts            Account[]
-  credential          PasswordCredential?
-  passwordResetTokens PasswordResetToken[]
-  sentInvitations     TenantInvitation[]   @relation("InvitationSender")
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                       String                     @id @default(uuid()) @db.Uuid
+  name                     String?
+  email                    String                     @unique
+  emailVerified            DateTime?
+  image                    String?
+  status                   UserStatus                 @default(INVITED)
+  memberships              TenantMembership[]
+  auditLogs                AuditLog[]                 @relation("AuditActor")
+  accounts                 Account[]
+  credential               PasswordCredential?
+  passwordResetTokens      PasswordResetToken[]
+  sentInvitations          TenantInvitation[]         @relation("InvitationSender")
+  createdReservations      Reservation[]              @relation("ReservationCreator")
+  cancelledReservations    Reservation[]              @relation("ReservationCanceller")
+  reservationStatusHistory ReservationStatusHistory[] @relation("ReservationStatusActor")
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 }
 
 model Tenant {
-  id                 String             @id @default(uuid()) @db.Uuid
-  legalName          String
-  tradeName          String
-  slug               String             @unique
-  status             TenantStatus       @default(ACTIVE)
-  memberships        TenantMembership[]
-  auditLogs          AuditLog[]
-  roles              Role[]
-  invitations        TenantInvitation[]
-  units              Unit[]
-  customers          Customer[]
-  customerContacts   CustomerContact[]
-  customerAddresses  CustomerAddress[]
-  contracts          Contract[]
-  contractUnits      ContractUnit[]
-  resourceCategories ResourceCategory[]
-  resources          Resource[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                       String                     @id @default(uuid()) @db.Uuid
+  legalName                String
+  tradeName                String
+  slug                     String                     @unique
+  status                   TenantStatus               @default(ACTIVE)
+  memberships              TenantMembership[]
+  auditLogs                AuditLog[]
+  roles                    Role[]
+  invitations              TenantInvitation[]
+  units                    Unit[]
+  customers                Customer[]
+  customerContacts         CustomerContact[]
+  customerAddresses        CustomerAddress[]
+  contracts                Contract[]
+  contractUnits            ContractUnit[]
+  resourceCategories       ResourceCategory[]
+  resources                Resource[]
+  reservations             Reservation[]
+  reservationItems         ReservationItem[]
+  reservationStatusHistory ReservationStatusHistory[]
+  timeZone                 String                     @default("America/Sao_Paulo")
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 }
 
 model Unit {
@@ -132,6 +146,7 @@ model Unit {
   tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   contracts    ContractUnit[]
   resources    Resource[]
+  reservations Reservation[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -156,6 +171,7 @@ model Customer {
   contacts           CustomerContact[]
   addresses          CustomerAddress[]
   contracts          Contract[]
+  reservations       Reservation[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -209,20 +225,21 @@ model CustomerAddress {
 }
 
 model Contract {
-  id          String         @id @default(uuid()) @db.Uuid
-  tenantId    String         @db.Uuid
-  customerId  String         @db.Uuid
-  code        String
-  title       String
-  description String?
-  startDate   DateTime       @db.Date
-  endDate     DateTime?      @db.Date
-  status      ContractStatus @default(DRAFT)
-  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  customer    Customer       @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
-  units       ContractUnit[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String         @db.Uuid
+  customerId   String         @db.Uuid
+  code         String
+  title        String
+  description  String?
+  startDate    DateTime       @db.Date
+  endDate      DateTime?      @db.Date
+  status       ContractStatus @default(DRAFT)
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer     Customer       @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  units        ContractUnit[]
+  reservations Reservation[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@unique([tenantId, code])
   @@unique([tenantId, id])
@@ -274,6 +291,7 @@ model Resource {
   tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   unit              Unit                      @relation(fields: [tenantId, unitId], references: [tenantId, id], onDelete: Restrict)
   category          ResourceCategory          @relation(fields: [tenantId, categoryId], references: [tenantId, id], onDelete: Restrict)
+  reservationItems  ReservationItem[]
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
 
@@ -282,6 +300,79 @@ model Resource {
   @@index([tenantId, status, operationalStatus])
   @@index([tenantId, unitId])
   @@index([tenantId, categoryId])
+}
+
+model Reservation {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  tenantId           String                     @db.Uuid
+  customerId         String                     @db.Uuid
+  contractId         String?                    @db.Uuid
+  unitId             String                     @db.Uuid
+  code               String
+  title              String
+  description        String?
+  startAt            DateTime                   @db.Timestamptz(3)
+  endAt              DateTime                   @db.Timestamptz(3)
+  status             ReservationStatus          @default(DRAFT)
+  createdByUserId    String                     @db.Uuid
+  cancelledAt        DateTime?                  @db.Timestamptz(3)
+  cancelledByUserId  String?                    @db.Uuid
+  cancellationReason String?
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer           Customer                   @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  contract           Contract?                  @relation(fields: [tenantId, contractId], references: [tenantId, id], onDelete: Restrict)
+  unit               Unit                       @relation(fields: [tenantId, unitId], references: [tenantId, id], onDelete: Restrict)
+  createdBy          User                       @relation("ReservationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  cancelledBy        User?                      @relation("ReservationCanceller", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  items              ReservationItem[]
+  statusHistory      ReservationStatusHistory[]
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+  @@index([tenantId, startAt])
+  @@index([tenantId, endAt])
+  @@index([tenantId, customerId])
+  @@index([tenantId, contractId])
+  @@index([tenantId, unitId])
+}
+
+model ReservationItem {
+  id            String            @id @default(uuid()) @db.Uuid
+  tenantId      String            @db.Uuid
+  reservationId String            @db.Uuid
+  resourceId    String            @db.Uuid
+  startAt       DateTime          @db.Timestamptz(3)
+  endAt         DateTime          @db.Timestamptz(3)
+  status        ReservationStatus
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reservation   Reservation       @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Cascade)
+  resource      Resource          @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([reservationId, resourceId])
+  @@index([tenantId, reservationId])
+  @@index([tenantId, resourceId, startAt, endAt])
+}
+
+model ReservationStatusHistory {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @db.Uuid
+  reservationId String             @db.Uuid
+  fromStatus    ReservationStatus?
+  toStatus      ReservationStatus
+  actorUserId   String             @db.Uuid
+  reason        String?
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reservation   Reservation        @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Cascade)
+  actor         User               @relation("ReservationStatusActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  createdAt     DateTime           @default(now())
+
+  @@index([tenantId, reservationId, createdAt])
+  @@index([actorUserId, createdAt])
 }
 
 model TenantMembership {

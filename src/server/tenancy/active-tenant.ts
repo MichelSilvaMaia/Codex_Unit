@@ -44,7 +44,7 @@ export async function getActiveTenantContext() {
     select: {
       id: true,
       tenantId: true,
-      tenant: { select: { slug: true, tradeName: true } },
+      tenant: { select: { slug: true, tradeName: true, timeZone: true } },
       roles: { select: { role: { select: { id: true, tenantId: true, permissions: { select: { permission: { select: { code: true } } } } } } } },
     },
   });
@@ -57,6 +57,7 @@ export async function getActiveTenantContext() {
     tenantId: membership.tenantId,
     tenantSlug: membership.tenant.slug,
     tenantName: membership.tenant.tradeName,
+    timeZone: membership.tenant.timeZone,
     membershipId: membership.id,
     permissions,
   };
