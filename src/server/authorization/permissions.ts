@@ -39,6 +39,7 @@ export const PERMISSIONS = [
   "reservations.reject",
   "reservations.mark_urgent",
   "pickups.view", "pickups.start", "pickups.inspect", "pickups.complete", "pickups.refuse", "pickups.view_evidence", "pickups.add_evidence",
+  "pickups.acceptance.view", "pickups.acceptance.create", "pickups.acceptance.request_otp", "pickups.acceptance.verify", "pickups.acceptance.capture_signature",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -54,6 +55,7 @@ export const INITIAL_ROLE_MATRIX: Record<"tenant-admin" | "manager" | "superviso
     "resource_categories.view", "resource_categories.manage",
     "reservations.view", "reservations.create", "reservations.update", "reservations.cancel", "reservations.confirm", "reservations.submit", "reservations.approve", "reservations.reject", "reservations.mark_urgent",
     "pickups.view", "pickups.start", "pickups.inspect", "pickups.complete", "pickups.refuse", "pickups.view_evidence", "pickups.add_evidence",
+    "pickups.acceptance.view", "pickups.acceptance.create", "pickups.acceptance.request_otp", "pickups.acceptance.verify", "pickups.acceptance.capture_signature",
   ],
   supervisor: [
     "tenant.view", "users.view", "units.view", "customers.view",
@@ -66,7 +68,7 @@ export const INITIAL_ROLE_MATRIX: Record<"tenant-admin" | "manager" | "superviso
     "resources.view", "resource_categories.view",
     "reservations.view", "reservations.create", "reservations.update", "reservations.submit",
   ],
-  "gate-operator": ["tenant.view", "reservations.view", "resources.view", "pickups.view", "pickups.start", "pickups.inspect", "pickups.complete", "pickups.refuse", "pickups.view_evidence", "pickups.add_evidence"],
+  "gate-operator": ["tenant.view", "reservations.view", "resources.view", "pickups.view", "pickups.start", "pickups.inspect", "pickups.complete", "pickups.refuse", "pickups.view_evidence", "pickups.add_evidence", "pickups.acceptance.view", "pickups.acceptance.create", "pickups.acceptance.request_otp", "pickups.acceptance.verify", "pickups.acceptance.capture_signature"],
 };
 
 export function hasPermission(granted: ReadonlySet<string>, required: Permission) {

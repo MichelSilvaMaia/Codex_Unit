@@ -50,6 +50,11 @@ const permissionDescriptions: Record<(typeof PERMISSIONS)[number], string> = {
   "pickups.refuse": "Recusar retirada",
   "pickups.view_evidence": "Visualizar evidências operacionais",
   "pickups.add_evidence": "Adicionar evidências operacionais",
+  "pickups.acceptance.view": "Visualizar aceites de retirada",
+  "pickups.acceptance.create": "Criar tentativa de aceite",
+  "pickups.acceptance.request_otp": "Solicitar OTP de aceite",
+  "pickups.acceptance.verify": "Validar OTP de aceite",
+  "pickups.acceptance.capture_signature": "Capturar assinatura do destinatário",
 };
 
 async function main() {

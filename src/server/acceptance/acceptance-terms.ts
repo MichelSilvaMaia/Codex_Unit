@@ -1,0 +1,3 @@
+import { createHash } from "node:crypto";
+export const PICKUP_TERMS_VERSION = "pickup-acceptance-v1";
+export function buildPickupTerms(input:{reservationCode:string;recipientName:string;resources:string[];conditions:string[]}) { const snapshot=[`Termo ${PICKUP_TERMS_VERSION}`,`Reserva: ${input.reservationCode}`,`Destinatário: ${input.recipientName}`,`Recursos: ${input.resources.join(", ")}`,`Condições: ${input.conditions.join(", ")}`,"Confirmo o recebimento e a responsabilidade pelos recursos relacionados."].join("\n"); return {version:PICKUP_TERMS_VERSION,snapshot,hash:createHash("sha256").update(snapshot).digest("hex")}; }

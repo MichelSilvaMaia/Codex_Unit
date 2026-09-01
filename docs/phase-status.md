@@ -28,3 +28,7 @@ O workflow de aprovação, autoaprovação explícita do gerente, reprovação m
 ## Fase 6 — VALIDADA EM POSTGRESQL
 
 Retiradas usam tentativas `1:N`, checklist integral, recusa sem cancelamento comercial, custódia por recurso e apenas uma conclusão por reserva. Migration, constraint parcial, transação atômica e dupla conclusão concorrente foram comprovadas em PostgreSQL real.
+
+## Fase 7 — VALIDADA EM POSTGRESQL
+
+Aceite por assinatura desenhada ou OTP multicanal foi vinculado à tentativa específica de retirada. O código OTP é armazenado somente como HMAC, possui expiração, limite e consumo único. Testes concorrentes reais comprovaram: replay rejeitado; apenas um vencedor ao validar o mesmo OTP; apenas um aceite final na corrida assinatura × OTP; e impossibilidade de reaproveitar aceite de retirada recusada.

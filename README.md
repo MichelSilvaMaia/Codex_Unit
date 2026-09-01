@@ -33,6 +33,7 @@ Substitua os valores de desenvolvimento antes de usar a aplicação fora do ambi
 - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`: habilitam login Google quando ambos existem.
 - `MICROSOFT_ENTRA_ID_CLIENT_ID` e `MICROSOFT_ENTRA_ID_CLIENT_SECRET`: habilitam login Microsoft; `MICROSOFT_ENTRA_ID_TENANT_ID` aceita `common` ou o tenant do Entra ID.
 - `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD`: credencial inicial somente para desenvolvimento. A senha deve ter de 12 a 128 caracteres.
+- `OTP_HMAC_SECRET`: segredo com pelo menos 32 caracteres usado para proteger códigos OTP; obrigatório para solicitar e validar desafios.
 
 ## Banco local
 
@@ -59,6 +60,8 @@ pnpm dev
 Rotas de identidade: `/login`, `/select-tenant`, `/account`, `/users`, `/roles` e `/api/auth/*`. Rotas operacionais: `/units`, `/customers`, `/customers/[id]`, `/contracts`, `/resources`, `/reservations`, `/reservations/new`, `/reservations/[id]`, `/pickups` e `/pickups/[id]`. `/dashboard` e toda rota operacional exigem sessão e empresa ativa.
 
 O login por e-mail e senha exige usuário ativo e credencial com hash bcrypt. Google e Microsoft são opcionais e só aceitam contas previamente cadastradas e ativas; o primeiro login social não cria acesso automático. Depois do login, uma única membership ativa é selecionada automaticamente, enquanto múltiplas empresas levam ao seletor. A empresa ativa fica em cookie assinado, `HttpOnly`, com validade curta, e sempre é revalidada no servidor.
+
+Na retirada, assinatura desenhada e OTP são métodos alternativos de aceite. O OTP tenta WhatsApp, SMS e e-mail por uma interface desacoplada de fornecedor. A implementação de desenvolvimento nunca opera em produção; conecte um adaptador real antes de disponibilizar OTP externamente.
 
 Convites e redefinições de senha usam tokens aleatórios, armazenados somente como hash, com expiração e consumo único. Esta fase fornece os serviços de domínio; o envio de e-mail e as telas públicas de aceite/redefinição ficam para a integração de comunicação.
 
