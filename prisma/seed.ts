@@ -55,6 +55,13 @@ const permissionDescriptions: Record<(typeof PERMISSIONS)[number], string> = {
   "pickups.acceptance.request_otp": "Solicitar OTP de aceite",
   "pickups.acceptance.verify": "Validar OTP de aceite",
   "pickups.acceptance.capture_signature": "Capturar assinatura do destinatário",
+  "returns.view": "Visualizar fila e devoluções",
+  "returns.start": "Iniciar devolução",
+  "returns.inspect": "Inspecionar recursos devolvidos",
+  "returns.complete": "Concluir devolução integral",
+  "returns.cancel": "Cancelar tentativa de devolução",
+  "returns.add_evidence": "Adicionar evidências de devolução",
+  "returns.view_evidence": "Visualizar evidências de devolução",
 };
 
 async function main() {
@@ -137,14 +144,14 @@ async function main() {
     create: { tenantId: tenant.id, type: "COMPANY", legalName: "Cliente Demonstração Ltda.", tradeName: "Cliente Demonstração", document: "DEMO-0001", normalizedDocument: "DEMO0001", status: "ACTIVE" },
   });
   const category = await prisma.resourceCategory.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: "CABINE" } },
+    where: { tenantId_code: { tenantId: tenant.id, code: "VEICULO" } },
     update: { status: "ACTIVE" },
-    create: { tenantId: tenant.id, code: "CABINE", name: "Cabine Sanitária", status: "ACTIVE" },
+    create: { tenantId: tenant.id, code: "VEICULO", name: "Veículos", status: "ACTIVE" },
   });
   await prisma.resource.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: "CAB-001" } },
+    where: { tenantId_code: { tenantId: tenant.id, code: "VEH-001" } },
     update: { status: "ACTIVE", operationalStatus: "AVAILABLE", unitId: unit.id, categoryId: category.id },
-    create: { tenantId: tenant.id, unitId: unit.id, categoryId: category.id, code: "CAB-001", name: "Cabine 001", status: "ACTIVE", operationalStatus: "AVAILABLE" },
+    create: { tenantId: tenant.id, unitId: unit.id, categoryId: category.id, code: "VEH-001", name: "Veículo Utilitário 001", description: "Veículo demonstrativo para reservas e controle de custódia", status: "ACTIVE", operationalStatus: "AVAILABLE" },
   });
   await prisma.contract.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: "CTR-DEMO" } },

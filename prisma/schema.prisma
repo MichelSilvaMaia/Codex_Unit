@@ -85,7 +85,34 @@ enum ReservationStatus {
   CONFIRMED
   READY_FOR_PICKUP
   RELEASED
+  RETURNED
   CANCELLED
+}
+
+enum ReturnStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ReturnPresence {
+  PRESENT
+  NOT_PRESENT
+}
+
+enum ReturnCondition {
+  GOOD
+  DAMAGED
+  MISSING_COMPONENTS
+  DIRTY
+  UNUSABLE
+  OTHER
+}
+
+enum ReturnDisposition {
+  AVAILABLE
+  MAINTENANCE
+  UNAVAILABLE
 }
 
 enum PickupStatus {
@@ -122,10 +149,14 @@ enum EvidenceType {
   DIVERGENCE
   RESOURCE_IDENTIFICATION
   OUTPUT_CONDITION
+  RETURN_CONDITION
+  RETURN_DAMAGE
+  MISSING_COMPONENT
 }
 
 enum CustodyEventType {
   RELEASED_TO_RECIPIENT
+  RETURNED_TO_TENANT
 }
 
 enum AcceptanceMethod {
@@ -198,6 +229,9 @@ model User {
   uploadedEvidence         OperationalEvidence[]      @relation("EvidenceUploader")
   custodyEvents            ResourceCustodyEvent[]     @relation("CustodyActor")
   acceptanceSignatures     AcceptanceSignature[]      @relation("SignatureCapturer")
+  processedReturns         ReservationReturn[]        @relation("ReturnProcessor")
+  inspectedReturnItems     ReservationReturnItem[]    @relation("ReturnItemInspector")
+  uploadedReturnEvidence   ReturnEvidence[]           @relation("ReturnEvidenceUploader")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 }
@@ -232,6 +266,9 @@ model Tenant {
   otpChallenges            PickupOtpChallenge[]
   otpDeliveryAttempts      OtpDeliveryAttempt[]
   acceptanceSignatures     AcceptanceSignature[]
+  returns                  ReservationReturn[]
+  returnItems              ReservationReturnItem[]
+  returnEvidence           ReturnEvidence[]
   timeZone                 String                     @default("America/Sao_Paulo")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
@@ -402,6 +439,7 @@ model Resource {
   reservationItems  ReservationItem[]
   pickupItems       ReservationPickupItem[]
   custodyEvents     ResourceCustodyEvent[]
+  returnItems       ReservationReturnItem[]
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
 
@@ -451,6 +489,7 @@ model Reservation {
   approvals          ReservationApproval[]
   pickups            ReservationPickup[]
   custodyEvents      ResourceCustodyEvent[]
+  returns            ReservationReturn[]
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
@@ -492,6 +531,7 @@ model ReservationItem {
   reservation   Reservation             @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Cascade)
   resource      Resource                @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
   pickupItems   ReservationPickupItem[]
+  returnItems   ReservationReturnItem[]
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
 
@@ -523,6 +563,7 @@ model ReservationPickup {
   evidence          OperationalEvidence[]
   custodyEvents     ResourceCustodyEvent[]
   acceptances       PickupAcceptance[]
+  returns           ReservationReturn[]
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
 
@@ -578,25 +619,104 @@ model OperationalEvidence {
 }
 
 model ResourceCustodyEvent {
-  id            String            @id @default(uuid()) @db.Uuid
-  tenantId      String            @db.Uuid
-  resourceId    String            @db.Uuid
-  reservationId String            @db.Uuid
-  pickupId      String            @db.Uuid
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @db.Uuid
+  resourceId    String             @db.Uuid
+  reservationId String             @db.Uuid
+  pickupId      String             @db.Uuid
+  returnId      String?            @db.Uuid
   type          CustodyEventType
   fromParty     String
   toParty       String
-  actorUserId   String            @db.Uuid
-  occurredAt    DateTime          @default(now()) @db.Timestamptz(3)
+  actorUserId   String             @db.Uuid
+  occurredAt    DateTime           @default(now()) @db.Timestamptz(3)
   metadata      Json?
-  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  resource      Resource          @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
-  reservation   Reservation       @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Restrict)
-  pickup        ReservationPickup @relation(fields: [tenantId, pickupId], references: [tenantId, id], onDelete: Restrict)
-  actor         User              @relation("CustodyActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  resource      Resource           @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
+  reservation   Reservation        @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Restrict)
+  pickup        ReservationPickup  @relation(fields: [tenantId, pickupId], references: [tenantId, id], onDelete: Restrict)
+  returnRecord  ReservationReturn? @relation(fields: [tenantId, returnId], references: [tenantId, id], onDelete: Restrict)
+  actor         User               @relation("CustodyActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, resourceId, occurredAt])
   @@index([tenantId, reservationId])
+}
+
+model ReservationReturn {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  tenantId           String                  @db.Uuid
+  reservationId      String                  @db.Uuid
+  pickupId           String                  @db.Uuid
+  status             ReturnStatus            @default(IN_PROGRESS)
+  startedAt          DateTime                @default(now()) @db.Timestamptz(3)
+  completedAt        DateTime?               @db.Timestamptz(3)
+  cancelledAt        DateTime?               @db.Timestamptz(3)
+  processedByUserId  String                  @db.Uuid
+  returnedByName     String?
+  returnedByDocument String?
+  returnedByPhone    String?
+  vehiclePlate       String?
+  notes              String?
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reservation        Reservation             @relation(fields: [tenantId, reservationId], references: [tenantId, id], onDelete: Restrict)
+  pickup             ReservationPickup       @relation(fields: [tenantId, pickupId], references: [tenantId, id], onDelete: Restrict)
+  processedBy        User                    @relation("ReturnProcessor", fields: [processedByUserId], references: [id], onDelete: Restrict)
+  items              ReservationReturnItem[]
+  evidence           ReturnEvidence[]
+  custodyEvents      ResourceCustodyEvent[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@unique([tenantId, id])
+  @@index([tenantId, reservationId, createdAt])
+  @@index([tenantId, pickupId, status])
+}
+
+model ReservationReturnItem {
+  id                String             @id @default(uuid()) @db.Uuid
+  tenantId          String             @db.Uuid
+  returnId          String             @db.Uuid
+  reservationItemId String             @db.Uuid
+  resourceId        String             @db.Uuid
+  presence          ReturnPresence     @default(PRESENT)
+  condition         ReturnCondition?
+  disposition       ReturnDisposition?
+  notes             String?
+  inspectedAt       DateTime?          @db.Timestamptz(3)
+  inspectedByUserId String?            @db.Uuid
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  returnRecord      ReservationReturn  @relation(fields: [tenantId, returnId], references: [tenantId, id], onDelete: Cascade)
+  reservationItem   ReservationItem    @relation(fields: [reservationItemId], references: [id], onDelete: Restrict)
+  resource          Resource           @relation(fields: [tenantId, resourceId], references: [tenantId, id], onDelete: Restrict)
+  inspectedBy       User?              @relation("ReturnItemInspector", fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+  evidence          ReturnEvidence[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([returnId, reservationItemId])
+  @@unique([tenantId, id])
+  @@index([tenantId, returnId])
+  @@index([tenantId, resourceId])
+}
+
+model ReturnEvidence {
+  id               String                 @id @default(uuid()) @db.Uuid
+  tenantId         String                 @db.Uuid
+  returnId         String                 @db.Uuid
+  returnItemId     String?                @db.Uuid
+  type             EvidenceType
+  storageKey       String                 @unique
+  mimeType         String
+  size             Int
+  checksum         String
+  uploadedByUserId String                 @db.Uuid
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  returnRecord     ReservationReturn      @relation(fields: [tenantId, returnId], references: [tenantId, id], onDelete: Cascade)
+  returnItem       ReservationReturnItem? @relation(fields: [tenantId, returnItemId], references: [tenantId, id], onDelete: Cascade)
+  uploadedBy       User                   @relation("ReturnEvidenceUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime               @default(now())
+
+  @@index([tenantId, returnId, createdAt])
 }
 
 model ReservationStatusHistory {

@@ -57,7 +57,7 @@ O seed cria permissões, os papéis Tenant Admin, Manager, Supervisor, Operator 
 pnpm dev
 ```
 
-Rotas de identidade: `/login`, `/select-tenant`, `/account`, `/users`, `/roles` e `/api/auth/*`. Rotas operacionais: `/units`, `/customers`, `/customers/[id]`, `/contracts`, `/resources`, `/reservations`, `/reservations/new`, `/reservations/[id]`, `/pickups` e `/pickups/[id]`. `/dashboard` e toda rota operacional exigem sessão e empresa ativa.
+Rotas de identidade: `/login`, `/select-tenant`, `/account`, `/users`, `/roles` e `/api/auth/*`. Rotas operacionais: `/units`, `/customers`, `/customers/[id]`, `/contracts`, `/resources`, `/reservations`, `/reservations/new`, `/reservations/[id]`, `/pickups`, `/pickups/[id]`, `/returns` e `/returns/[id]`. `/dashboard` e toda rota operacional exigem sessão e empresa ativa.
 
 O login por e-mail e senha exige usuário ativo e credencial com hash bcrypt. Google e Microsoft são opcionais e só aceitam contas previamente cadastradas e ativas; o primeiro login social não cria acesso automático. Depois do login, uma única membership ativa é selecionada automaticamente, enquanto múltiplas empresas levam ao seletor. A empresa ativa fica em cookie assinado, `HttpOnly`, com validade curta, e sempre é revalidada no servidor.
 
@@ -103,3 +103,5 @@ docs/adr/            decisões arquiteturais
 ## Disponibilidade futura
 
 `Resource.status` é administrativo e `Resource.operationalStatus` representa condições como manutenção, indisponibilidade física ou `IN_USE` após a saída. Não existe status `RESERVED`: disponibilidade é calculada pelos intervalos de `ReservationItem`. O PostgreSQL impede sobreposição concorrente de itens `PENDING_APPROVAL`, `APPROVED`, `CONFIRMED`, `READY_FOR_PICKUP` ou `RELEASED` por exclusion constraint GiST. Reservas urgentes mantêm as mesmas garantias e exigem justificativa.
+
+Na devolução, `RETURNED` encerra a custódia física sem alterar o período originalmente contratado. Recursos em boas condições retornam a `AVAILABLE`; avarias são aceitas em custódia e encaminhadas para `MAINTENANCE` ou `UNAVAILABLE` com evidência obrigatória.

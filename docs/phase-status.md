@@ -36,3 +36,7 @@ Aceite por assinatura desenhada ou OTP multicanal foi vinculado à tentativa esp
 ## Fase 7.1 — PARCIAL: CÓDIGO CONCLUÍDO, HOMOLOGAÇÃO EXTERNA PENDENTE
 
 Adapters Zenvia v2 para WhatsApp com template aprovado e SMS, adapter Resend com idempotência, fallback sequencial, timeouts e webhooks autenticados foram implementados. Migration e mocks estão validados, mas nenhum envio real foi executado sem credenciais externas. A pendência não bloqueia a Fase 8.
+
+## Fase 8 — VALIDADA EM POSTGRESQL
+
+Devolução integral, inspeção por recurso, evidência de irregularidade, reentrada de custódia e disposition operacional foram implementadas. Constraints parciais e transação serializável impedem dupla devolução; testes reais comprovam concorrência, rollback, avaria aceita, recurso ausente e preservação do período planejado. O seed visual agora usa `VEICULO/VEH-001`.

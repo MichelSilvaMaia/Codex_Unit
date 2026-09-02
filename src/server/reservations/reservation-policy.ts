@@ -10,7 +10,8 @@ export const RESERVATION_TRANSITIONS: Record<ReservationStatus, readonly Reserva
   REJECTED: ["DRAFT"],
   CONFIRMED: ["READY_FOR_PICKUP", "CANCELLED"],
   READY_FOR_PICKUP: ["RELEASED", "CANCELLED"],
-  RELEASED: [],
+  RELEASED: ["RETURNED"],
+  RETURNED: [],
   CANCELLED: [],
 };
 

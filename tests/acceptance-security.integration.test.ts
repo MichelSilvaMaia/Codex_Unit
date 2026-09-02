@@ -96,7 +96,7 @@ suite("Phase 7 acceptance security on PostgreSQL", () => {
       where: { tenantId_code: { tenantId: tenant.id, code: "BASE-SP" } },
     });
     const resource = await prisma.resource.findUniqueOrThrow({
-      where: { tenantId_code: { tenantId: tenant.id, code: "CAB-001" } },
+      where: { tenantId_code: { tenantId: tenant.id, code: "VEH-001" } },
     });
     resourceId = resource.id;
     const context = {

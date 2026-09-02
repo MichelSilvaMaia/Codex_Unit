@@ -16,7 +16,7 @@ describe("operational domain validation", () => {
   });
 
   it("keeps reservation out of resource state", () => {
-    const base = { unitId: crypto.randomUUID(), categoryId: crypto.randomUUID(), code: "R-1", name: "Cabine" };
+    const base = { unitId: crypto.randomUUID(), categoryId: crypto.randomUUID(), code: "VEH-TEST", name: "Veículo de teste" };
     expect(resourceSchema.safeParse({ ...base, operationalStatus: "RESERVED" }).success).toBe(false);
     expect(isResourceOperationallyAvailable("ACTIVE", "AVAILABLE")).toBe(true);
     expect(isResourceOperationallyAvailable("INACTIVE", "AVAILABLE")).toBe(false);
