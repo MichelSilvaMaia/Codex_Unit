@@ -62,6 +62,16 @@ const permissionDescriptions: Record<(typeof PERMISSIONS)[number], string> = {
   "returns.cancel": "Cancelar tentativa de devolução",
   "returns.add_evidence": "Adicionar evidências de devolução",
   "returns.view_evidence": "Visualizar evidências de devolução",
+  "maintenance.view": "Visualizar manutenção",
+  "maintenance.create": "Abrir ordem de manutenção",
+  "maintenance.update": "Atualizar ordem de manutenção",
+  "maintenance.diagnose": "Registrar diagnóstico",
+  "maintenance.perform": "Registrar intervenção",
+  "maintenance.complete": "Concluir serviço técnico",
+  "maintenance.release": "Liberar recurso operacionalmente",
+  "maintenance.cancel": "Cancelar ordem de manutenção",
+  "maintenance.add_evidence": "Adicionar evidência de manutenção",
+  "maintenance.view_evidence": "Visualizar evidência de manutenção",
 };
 
 async function main() {

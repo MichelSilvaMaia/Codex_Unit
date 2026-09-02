@@ -1,0 +1,9 @@
+"use server";
+import {revalidatePath} from "next/cache";import {redirect} from "next/navigation";import {addDiagnosis,addMaintenanceActivity,cancelMaintenanceOrder,createMaintenanceOrder,releaseMaintenanceOrder,transitionMaintenance} from "@/server/maintenance/maintenance-service";import {getActiveTenantContext} from "@/server/tenancy/active-tenant";
+const text=(f:FormData,n:string)=>String(f.get(n)??"");
+export async function createMaintenanceAction(f:FormData){const r=await createMaintenanceOrder(await getActiveTenantContext(),{resourceId:text(f,"resourceId"),sourceType:text(f,"sourceType"),title:text(f,"title"),description:text(f,"description"),priority:text(f,"priority")});redirect(`/maintenance/${r.order.id}`);}
+export async function transitionMaintenanceAction(id:string,f:FormData){await transitionMaintenance(await getActiveTenantContext(),id,{toStatus:text(f,"toStatus"),reason:text(f,"reason")});revalidatePath(`/maintenance/${id}`);}
+export async function addDiagnosisAction(id:string,f:FormData){await addDiagnosis(await getActiveTenantContext(),id,{description:text(f,"description")});revalidatePath(`/maintenance/${id}`);}
+export async function addActivityAction(id:string,f:FormData){await addMaintenanceActivity(await getActiveTenantContext(),id,{type:text(f,"type"),description:text(f,"description")});revalidatePath(`/maintenance/${id}`);}
+export async function releaseMaintenanceAction(id:string,f:FormData){await releaseMaintenanceOrder(await getActiveTenantContext(),id,{releaseNotes:text(f,"releaseNotes")});revalidatePath(`/maintenance/${id}`);revalidatePath("/maintenance");}
+export async function cancelMaintenanceAction(id:string,f:FormData){await cancelMaintenanceOrder(await getActiveTenantContext(),id,{cancellationReason:text(f,"cancellationReason"),resultingOperationalStatus:text(f,"resultingOperationalStatus")});revalidatePath(`/maintenance/${id}`);revalidatePath("/maintenance");}

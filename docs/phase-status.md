@@ -40,3 +40,12 @@ Adapters Zenvia v2 para WhatsApp com template aprovado e SMS, adapter Resend com
 ## Fase 8 — VALIDADA EM POSTGRESQL
 
 Devolução integral, inspeção por recurso, evidência de irregularidade, reentrada de custódia e disposition operacional foram implementadas. Constraints parciais e transação serializável impedem dupla devolução; testes reais comprovam concorrência, rollback, avaria aceita, recurso ausente e preservação do período planejado. O seed visual agora usa `VEICULO/VEH-001`.
+# FASE 9 — CONCLUÍDA — VALIDADA EM POSTGRESQL
+
+- Ordens de manutenção, diagnóstico, atividades, evidências e histórico tenant-safe.
+- Uma ordem ativa por recurso garantida por índice parcial PostgreSQL.
+- Devolução irregular e ordem de manutenção atômicas.
+- Conclusão técnica separada da liberação operacional explícita.
+- Central de manutenção responsiva e modernização do shell visual compartilhado.
+
+FASE 7.1 permanece **PARCIAL — homologação externa Zenvia/Resend pendente**.

@@ -41,6 +41,7 @@ export const PERMISSIONS = [
   "pickups.view", "pickups.start", "pickups.inspect", "pickups.complete", "pickups.refuse", "pickups.view_evidence", "pickups.add_evidence",
   "pickups.acceptance.view", "pickups.acceptance.create", "pickups.acceptance.request_otp", "pickups.acceptance.verify", "pickups.acceptance.capture_signature",
   "returns.view", "returns.start", "returns.inspect", "returns.complete", "returns.cancel", "returns.add_evidence", "returns.view_evidence",
+  "maintenance.view", "maintenance.create", "maintenance.update", "maintenance.diagnose", "maintenance.perform", "maintenance.complete", "maintenance.release", "maintenance.cancel", "maintenance.add_evidence", "maintenance.view_evidence",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -58,12 +59,14 @@ export const INITIAL_ROLE_MATRIX: Record<"tenant-admin" | "manager" | "superviso
     "pickups.view", "pickups.start", "pickups.inspect", "pickups.complete", "pickups.refuse", "pickups.view_evidence", "pickups.add_evidence",
     "pickups.acceptance.view", "pickups.acceptance.create", "pickups.acceptance.request_otp", "pickups.acceptance.verify", "pickups.acceptance.capture_signature",
     "returns.view", "returns.start", "returns.inspect", "returns.complete", "returns.cancel", "returns.add_evidence", "returns.view_evidence",
+    "maintenance.view", "maintenance.create", "maintenance.update", "maintenance.diagnose", "maintenance.perform", "maintenance.complete", "maintenance.release", "maintenance.cancel", "maintenance.add_evidence", "maintenance.view_evidence",
   ],
   supervisor: [
     "tenant.view", "users.view", "units.view", "customers.view",
     "contracts.view", "resources.view", "resources.update", "resource_categories.view",
     "reservations.view", "reservations.create", "reservations.update", "reservations.submit", "reservations.mark_urgent",
     "pickups.view", "pickups.inspect", "returns.view", "returns.start", "returns.inspect", "returns.complete", "returns.add_evidence", "returns.view_evidence",
+    "maintenance.view", "maintenance.create", "maintenance.update", "maintenance.diagnose", "maintenance.perform", "maintenance.complete", "maintenance.add_evidence", "maintenance.view_evidence",
   ],
   operator: [
     "tenant.view", "units.view", "customers.view", "contracts.view",

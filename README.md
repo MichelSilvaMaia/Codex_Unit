@@ -105,3 +105,10 @@ docs/adr/            decisões arquiteturais
 `Resource.status` é administrativo e `Resource.operationalStatus` representa condições como manutenção, indisponibilidade física ou `IN_USE` após a saída. Não existe status `RESERVED`: disponibilidade é calculada pelos intervalos de `ReservationItem`. O PostgreSQL impede sobreposição concorrente de itens `PENDING_APPROVAL`, `APPROVED`, `CONFIRMED`, `READY_FOR_PICKUP` ou `RELEASED` por exclusion constraint GiST. Reservas urgentes mantêm as mesmas garantias e exigem justificativa.
 
 Na devolução, `RETURNED` encerra a custódia física sem alterar o período originalmente contratado. Recursos em boas condições retornam a `AVAILABLE`; avarias são aceitas em custódia e encaminhadas para `MAINTENANCE` ou `UNAVAILABLE` com evidência obrigatória.
+# Codex Unit
+
+SaaS multiempresa para reservas e controle operacional de veículos e equipamentos. O ciclo coberto inclui reserva, aprovação, retirada, aceite, custódia, devolução, inspeção, manutenção e liberação operacional.
+
+## Fase 9
+
+A central `/maintenance` acompanha ordens, diagnósticos, intervenções, histórico e reservas futuras impactadas. A liberação é explícita e transacional; o PostgreSQL impede duas ordens ativas para o mesmo recurso.

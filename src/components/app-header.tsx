@@ -1,31 +1,3 @@
-import Link from "next/link";
-import { LogoutButton } from "@/components/auth/logout-button";
-import { BrandMark } from "@/components/brand-mark";
-import { hasPermission, type Permission } from "@/server/authorization/permissions";
-
-export function AppHeader({ tenantName, permissions = new Set<string>() }: { tenantName: string; permissions?: ReadonlySet<string> }) {
-  const operationalLinks: { href: string; label: string; permission: Permission }[] = [
-    { href: "/units", label: "Unidades", permission: "units.view" },
-    { href: "/customers", label: "Clientes", permission: "customers.view" },
-    { href: "/contracts", label: "Contratos", permission: "contracts.view" },
-    { href: "/resources", label: "Recursos", permission: "resources.view" },
-    { href: "/reservations", label: "Reservas", permission: "reservations.view" },
-    { href: "/pickups", label: "Portaria", permission: "pickups.view" },
-    { href: "/returns", label: "Devoluções", permission: "returns.view" },
-  ];
-  return (
-    <header className="border-b bg-background px-5 py-4 sm:px-8">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
-        <div><BrandMark /><p className="mt-1 text-xs text-muted-foreground">{tenantName}</p></div>
-        <nav aria-label="Navegação principal" className="order-3 flex w-full gap-4 overflow-x-auto pb-1 text-sm sm:order-none sm:w-auto">
-          <Link href="/dashboard">Início</Link>
-          {operationalLinks.filter((link) => hasPermission(permissions, link.permission)).map((link) => <Link href={link.href} key={link.href}>{link.label}</Link>)}
-          {hasPermission(permissions, "users.view") && <Link href="/users">Usuários</Link>}
-          {hasPermission(permissions, "roles.view") && <Link href="/roles">Papéis</Link>}
-          <Link href="/account">Conta</Link>
-        </nav>
-        <LogoutButton />
-      </div>
-    </header>
-  );
-}
+import Link from "next/link";import {Building2,CalendarDays,ChevronDown,ClipboardCheck,LayoutDashboard,PackageCheck,Settings2,Users,Wrench} from "lucide-react";import {LogoutButton} from "@/components/auth/logout-button";import {BrandMark} from "@/components/brand-mark";import {hasPermission,type Permission} from "@/server/authorization/permissions";
+const links:{href:string;label:string;permission?:Permission;icon:typeof LayoutDashboard}[]=[{href:"/dashboard",label:"Visão geral",icon:LayoutDashboard},{href:"/reservations",label:"Reservas",permission:"reservations.view",icon:CalendarDays},{href:"/pickups",label:"Portaria",permission:"pickups.view",icon:PackageCheck},{href:"/returns",label:"Devoluções",permission:"returns.view",icon:ClipboardCheck},{href:"/maintenance",label:"Manutenção",permission:"maintenance.view",icon:Wrench},{href:"/resources",label:"Recursos",permission:"resources.view",icon:Settings2},{href:"/customers",label:"Clientes",permission:"customers.view",icon:Users},{href:"/units",label:"Unidades",permission:"units.view",icon:Building2}];
+export function AppHeader({tenantName,permissions=new Set<string>()}:{tenantName:string;permissions?:ReadonlySet<string>}){return <header className="app-header"><div className="header-inner"><div className="brand-zone"><BrandMark/><span className="product-pill">Operations</span></div><nav aria-label="Navegação principal" className="primary-nav">{links.filter(l=>!l.permission||hasPermission(permissions,l.permission)).map(({href,label,icon:Icon})=><Link href={href} key={href}><Icon className="size-4"/><span>{label}</span></Link>)}</nav><div className="account-zone"><details className="relative"><summary className="tenant-switch"><span className="tenant-avatar">{tenantName.slice(0,1).toUpperCase()}</span><span className="hidden max-w-36 truncate sm:block">{tenantName}</span><ChevronDown className="size-3"/></summary><div className="account-menu"><Link href="/account">Minha conta</Link>{hasPermission(permissions,"users.view")&&<Link href="/users">Usuários</Link>}{hasPermission(permissions,"roles.view")&&<Link href="/roles">Papéis e acessos</Link>}<LogoutButton/></div></details></div></div></header>}
