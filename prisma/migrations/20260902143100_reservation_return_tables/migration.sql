@@ -89,5 +89,7 @@ ALTER TABLE "ReturnEvidence" ADD CONSTRAINT "ReturnEvidence_uploadedByUserId_fke
 ALTER TABLE "ResourceCustodyEvent" ADD CONSTRAINT "ResourceCustodyEvent_tenantId_returnId_fkey" FOREIGN KEY ("tenantId","returnId") REFERENCES "ReservationReturn"("tenantId","id") ON DELETE RESTRICT;
 ALTER TABLE "ResourceCustodyEvent" ADD CONSTRAINT "ResourceCustodyEvent_return_semantics" CHECK (("type"='RETURNED_TO_TENANT' AND "returnId" IS NOT NULL) OR ("type"<>'RETURNED_TO_TENANT' AND "returnId" IS NULL));
 
-UPDATE "ResourceCategory" SET "code"='VEICULO', "name"='Veículos' WHERE "code"='CABINE';
-UPDATE "Resource" SET "code"='VEH-001', "name"='Veículo Utilitário 001', "description"='Veículo demonstrativo para reservas e controle de custódia' WHERE "code"='CAB-001';
+UPDATE "ResourceCategory" SET "code"='VEICULO', "name"='Veículos'
+WHERE "code"='CABINE' AND "tenantId"=(SELECT "id" FROM "Tenant" WHERE "slug"='empresa-demonstracao');
+UPDATE "Resource" SET "code"='VEH-001', "name"='Veículo Utilitário 001', "description"='Veículo demonstrativo para reservas e controle de custódia'
+WHERE "code"='CAB-001' AND "tenantId"=(SELECT "id" FROM "Tenant" WHERE "slug"='empresa-demonstracao');
