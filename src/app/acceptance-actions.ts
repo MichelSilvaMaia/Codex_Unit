@@ -6,7 +6,7 @@ import {
   requestAcceptanceOtp,
   verifyAcceptanceOtp,
 } from "@/server/acceptance/acceptance-service";
-import { DevelopmentOtpProvider } from "@/server/acceptance/otp-provider";
+import { createOtpProviders } from "@/server/acceptance/provider-factory";
 import { AppError } from "@/server/errors/app-error";
 import { getActiveTenantContext } from "@/server/tenancy/active-tenant";
 
@@ -17,11 +17,7 @@ export async function requestPickupOtpAction(pickupId: string, form: FormData) {
     await getActiveTenantContext(),
     pickupId,
     { phone: text(form, "phone") || undefined, email: text(form, "email") || undefined },
-    [
-      new DevelopmentOtpProvider("WHATSAPP"),
-      new DevelopmentOtpProvider("SMS"),
-      new DevelopmentOtpProvider("EMAIL"),
-    ],
+    createOtpProviders(),
   );
   revalidatePath(`/pickups/${pickupId}`);
 }

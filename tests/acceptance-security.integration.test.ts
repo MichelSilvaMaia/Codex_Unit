@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import {
@@ -6,6 +7,7 @@ import {
   verifyAcceptanceOtp,
 } from "@/server/acceptance/acceptance-service";
 import type { OtpDeliveryProvider } from "@/server/acceptance/otp-provider";
+import { processResendWebhook, processZenviaWebhook } from "@/server/acceptance/delivery-webhooks";
 import {
   completePickup,
   inspectPickup,
@@ -29,7 +31,7 @@ class CapturingProvider implements OtpDeliveryProvider {
 
   async send(input: { code: string }) {
     this.code = input.code;
-    return { accepted: true, providerMessageId: "integration-test" };
+    return { accepted: true, retryable: false, providerMessageId: "integration-test" };
   }
 }
 
@@ -212,5 +214,54 @@ suite("Phase 7 acceptance security on PostgreSQL", () => {
     expect(challenge.attempts).toBe(5);
     expect(challenge.status).toBe("BLOCKED");
     await expect(verifyAcceptanceOtp(context, issued.challenge.id, provider.code)).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("falls back sequentially from WhatsApp failure to SMS success", async () => {
+    const { context, pickup } = await fixture();
+    const calls: string[] = [];
+    const providers: OtpDeliveryProvider[] = [
+      { name: "zenvia", channel: "WHATSAPP", async send() { calls.push("WHATSAPP"); return { accepted: false, retryable: true, fallbackAllowed: true, errorCode: "TIMEOUT" }; } },
+      { name: "zenvia", channel: "SMS", async send() { calls.push("SMS"); return { accepted: true, retryable: false, providerMessageId: "sms-fallback" }; } },
+    ];
+    const issued = await requestAcceptanceOtp(context, pickup.id, {}, providers);
+    expect(issued.channel).toBe("SMS");
+    expect(calls).toEqual(["WHATSAPP", "SMS"]);
+    expect(await prisma.otpDeliveryAttempt.findMany({ where: { challengeId: issued.challenge.id }, orderBy: { createdAt: "asc" }, select: { channel: true, status: true } })).toEqual([{ channel: "WHATSAPP", status: "FAILED" }, { channel: "SMS", status: "ACCEPTED" }]);
+  });
+
+  it("falls back through WhatsApp and SMS to Resend email", async () => {
+    const { context, pickup } = await fixture();
+    const calls: string[] = [];
+    const failure = (channel: "WHATSAPP" | "SMS"): OtpDeliveryProvider => ({ name: "zenvia", channel, async send() { calls.push(channel); return { accepted: false, retryable: true, fallbackAllowed: true, errorCode: "HTTP_503" }; } });
+    const email: OtpDeliveryProvider = { name: "resend", channel: "EMAIL", async send() { calls.push("EMAIL"); return { accepted: true, retryable: false, providerMessageId: "email-fallback" }; } };
+    const issued = await requestAcceptanceOtp(context, pickup.id, { email: "recipient@example.com" }, [failure("WHATSAPP"), failure("SMS"), email]);
+    expect(issued.channel).toBe("EMAIL");
+    expect(calls).toEqual(["WHATSAPP", "SMS", "EMAIL"]);
+  });
+
+  it("authenticates and idempotently applies Zenvia delivery webhooks", async () => {
+    const { context, pickup } = await fixture();
+    let code = "";
+    const provider: OtpDeliveryProvider = { name: "zenvia", channel: "WHATSAPP", async send(input) { code = input.code; return { accepted: true, retryable: false, providerMessageId: "zenvia-webhook-message" }; } };
+    const issued = await requestAcceptanceOtp(context, pickup.id, {}, [provider]);
+    expect(code).toHaveLength(6);
+    const raw = JSON.stringify({ id: `zenvia-event-${pickup.id}`, type: "MESSAGE_STATUS", timestamp: new Date().toISOString(), status: "DELIVERED", messageId: "zenvia-webhook-message" });
+    await expect(processZenviaWebhook(raw, "wrong", "expected")).rejects.toThrow("INVALID_WEBHOOK_AUTH");
+    expect(await processZenviaWebhook(raw, "expected", "expected")).toMatchObject({ matched: true, duplicate: false });
+    expect(await processZenviaWebhook(raw, "expected", "expected")).toMatchObject({ duplicate: true });
+    expect((await prisma.otpDeliveryAttempt.findFirstOrThrow({ where: { challengeId: issued.challenge.id } })).status).toBe("DELIVERED");
+  });
+
+  it("verifies Resend Svix signatures and correlates email delivery", async () => {
+    const { context, pickup } = await fixture();
+    const provider: OtpDeliveryProvider = { name: "resend", channel: "EMAIL", async send() { return { accepted: true, retryable: false, providerMessageId: "resend-email-1" }; } };
+    await requestAcceptanceOtp(context, pickup.id, { email: "recipient@example.com" }, [provider]);
+    const secret = `whsec_${Buffer.from("resend-webhook-test-secret").toString("base64")}`;
+    const event = { type: "email.delivered", created_at: new Date().toISOString(), data: { email_id: "resend-email-1" } };
+    const raw = JSON.stringify(event), id = `resend-event-${pickup.id}`, timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac("sha256", Buffer.from(secret.slice(6), "base64")).update(`${id}.${timestamp}.${raw}`).digest("base64");
+    const headers = new Headers({ "svix-id": id, "svix-timestamp": timestamp, "svix-signature": `v1,${signature}` });
+    expect(await processResendWebhook(raw, headers, secret)).toMatchObject({ matched: true, duplicate: false });
+    await expect(processResendWebhook(raw, new Headers(), secret)).rejects.toThrow("INVALID_WEBHOOK_AUTH");
   });
 });

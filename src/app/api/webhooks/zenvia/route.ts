@@ -1,0 +1,2 @@
+import {processZenviaWebhook} from "@/server/acceptance/delivery-webhooks";
+export async function POST(request:Request){const raw=await request.text();try{const result=await processZenviaWebhook(raw,request.headers.get("x-webhook-token"),process.env.ZENVIA_WEBHOOK_TOKEN);return Response.json(result);}catch(error){const unauthorized=error instanceof Error&&error.message==="INVALID_WEBHOOK_AUTH";return Response.json({error:unauthorized?"unauthorized":"invalid_event"},{status:unauthorized?401:400});}}

@@ -32,3 +32,7 @@ Retiradas usam tentativas `1:N`, checklist integral, recusa sem cancelamento com
 ## Fase 7 — VALIDADA EM POSTGRESQL
 
 Aceite por assinatura desenhada ou OTP multicanal foi vinculado à tentativa específica de retirada. O código OTP é armazenado somente como HMAC, possui expiração, limite e consumo único. Testes concorrentes reais comprovaram: replay rejeitado; apenas um vencedor ao validar o mesmo OTP; apenas um aceite final na corrida assinatura × OTP; e impossibilidade de reaproveitar aceite de retirada recusada.
+
+## Fase 7.1 — PARCIAL: CÓDIGO CONCLUÍDO, HOMOLOGAÇÃO EXTERNA PENDENTE
+
+Adapters Zenvia v2 para WhatsApp com template aprovado e SMS, adapter Resend com idempotência, fallback sequencial, timeouts e webhooks autenticados foram implementados. Migration e mocks estão validados, mas nenhum envio real foi executado sem credenciais externas. A pendência não bloqueia a Fase 8.

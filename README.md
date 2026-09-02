@@ -63,6 +63,10 @@ O login por e-mail e senha exige usuário ativo e credencial com hash bcrypt. Go
 
 Na retirada, assinatura desenhada e OTP são métodos alternativos de aceite. O OTP tenta WhatsApp, SMS e e-mail por uma interface desacoplada de fornecedor. A implementação de desenvolvimento nunca opera em produção; conecte um adaptador real antes de disponibilizar OTP externamente.
 
+### Production OTP Providers
+
+Produção usa Zenvia API v2 para WhatsApp/SMS e Resend para e-mail. Aceite da API não é tratado como entrega; webhooks autenticados atualizam o estado final. Consulte [o runbook de produção](docs/integrations/otp-providers-production.md) para templates, domínio SPF/DKIM, variáveis, homologação e rotação de credenciais.
+
 Convites e redefinições de senha usam tokens aleatórios, armazenados somente como hash, com expiração e consumo único. Esta fase fornece os serviços de domínio; o envio de e-mail e as telas públicas de aceite/redefinição ficam para a integração de comunicação.
 
 ## Qualidade

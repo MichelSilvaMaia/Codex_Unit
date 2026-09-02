@@ -1,0 +1,1 @@
+export function normalizeE164Brazil(value:string):string{let digits=value.replace(/\D/g,"");if(digits.startsWith("00"))digits=digits.slice(2);if(!digits.startsWith("55")&&(digits.length===10||digits.length===11))digits=`55${digits}`;if(!/^55\d{10,11}$/.test(digits))throw new Error("INVALID_DESTINATION");return digits;}

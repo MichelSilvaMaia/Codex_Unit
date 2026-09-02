@@ -158,8 +158,14 @@ enum OtpChannel {
 }
 
 enum OtpDeliveryStatus {
+  PENDING
   SENT
+  ACCEPTED
+  DELIVERED
   FAILED
+  BOUNCED
+  UNDELIVERED
+  DELAYED
 }
 
 enum ReservationDecision {
@@ -668,13 +674,29 @@ model OtpDeliveryAttempt {
   provider          String
   status            OtpDeliveryStatus
   providerMessageId String?
+  idempotencyKey    String             @unique
   errorCode         String?
+  acceptedAt        DateTime?          @db.Timestamptz(3)
+  deliveredAt       DateTime?          @db.Timestamptz(3)
+  failedAt          DateTime?          @db.Timestamptz(3)
+  lastEventAt       DateTime?          @db.Timestamptz(3)
   sentAt            DateTime           @default(now()) @db.Timestamptz(3)
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   challenge         PickupOtpChallenge @relation(fields: [tenantId, challengeId], references: [tenantId, id], onDelete: Cascade)
   createdAt         DateTime           @default(now())
 
+  @@unique([provider, providerMessageId])
   @@index([tenantId, challengeId, createdAt])
+}
+
+model OtpWebhookEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  provider   String
+  eventId    String
+  eventType  String
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([provider, eventId])
 }
 
 model AcceptanceSignature {
