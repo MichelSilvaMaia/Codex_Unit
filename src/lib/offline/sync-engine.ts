@@ -8,10 +8,11 @@ let running = false;
 async function runQueue(tenantId: string, userId: string): Promise<SyncSummary> {
   const online = await checkConnectivity(), summary = empty(online);
   if (!online) return summary;
+  await offlineStore.recoverInterrupted(tenantId, userId);
   const operations = await offlineStore.getPendingOperations(tenantId, userId);
   const available = new Set(operations.filter(o => o.status === "SYNCED").map(o => o.id));
   for (const operation of operations) {
-    if (!["PENDING", "FAILED_RETRYABLE", "SYNCING"].includes(operation.status)) continue;
+    if (!["PENDING", "FAILED_RETRYABLE", "AUTH_REQUIRED"].includes(operation.status)) continue;
     if (operation.nextAttemptAt && new Date(operation.nextAttemptAt).getTime() > Date.now()) continue;
     if (operation.dependsOnOperationIds.some(id => !available.has(id))) continue;
     await offlineStore.markSyncing(operation.id, tenantId, userId);
@@ -21,7 +22,7 @@ async function runQueue(tenantId: string, userId: string): Promise<SyncSummary> 
     } catch {
       await retry(operation, "NETWORK_ERROR"); summary.failed++; break;
     }
-    if (response.status === 401) { await offlineStore.markFailed(operation.id, tenantId, userId, "FAILED_RETRYABLE", "AUTH_REQUIRED", operation.attemptCount + 1); summary.authRequired = true; break; }
+    if (response.status === 401) { await offlineStore.markAuthRequired(operation.id, tenantId, userId); summary.authRequired = true; break; }
     if (response.ok) {
       const result = await response.json() as { resultReference?: string };
       await offlineStore.markSynced(operation.id, tenantId, userId, result.resultReference);

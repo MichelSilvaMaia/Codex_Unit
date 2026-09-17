@@ -1,4 +1,4 @@
-export type OfflineStatus = "PENDING" | "SYNCING" | "SYNCED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "CONFLICT";
+export type OfflineStatus = "PENDING" | "SYNCING" | "SYNCED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "CONFLICT" | "AUTH_REQUIRED";
 export type OfflineOperation = {
   id: string; clientOperationId: string; tenantId: string; userId: string; deviceId: string;
   operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY";
@@ -8,7 +8,7 @@ export type OfflineOperation = {
   createdAt: string; updatedAt: string; lastAttemptAt?: string; nextAttemptAt?: string;
   lastErrorCode?: string; serverResultId?: string; syncedAt?: string; schemaVersion: 1;
 };
-export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; blob: Blob; mimeType: string; size: number; checksum: string; createdAt: string };
+export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; blob: Blob; mimeType: string; size: number; checksum: string; createdAt: string; status?: "LOCAL" | "PENDING_UPLOAD" | "UPLOADING" | "SERVER_CONFIRMED" };
 type Metadata = { key: string; value: string };
 const DB_NAME = "codex-unit-offline";
 const DB_VERSION = 1;
@@ -66,6 +66,22 @@ export const offlineStore = {
       return rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     });
   },
+  async getAttachments(operationId: string, tenantId: string, userId: string) {
+    return withStore(stores.attachments, "readonly", async store => {
+      const rows = await requestResult(store.getAll() as IDBRequest<OfflineAttachment[]>);
+      return rows.filter(row => row.operationId === operationId && row.tenantId === tenantId && row.userId === userId);
+    });
+  },
+  async recoverInterrupted(tenantId: string, userId: string) {
+    const db = await openDatabase();
+    try {
+      const tx = db.transaction(stores.operations, "readwrite"), store = tx.objectStore(stores.operations);
+      const rows = await requestResult(store.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>);
+      // Called only while holding the cross-tab sync lock: another tab cannot be mid-request.
+      for (const row of rows.filter(row => row.status === "SYNCING")) store.put({ ...row, status: "FAILED_RETRYABLE", lastErrorCode: "INTERRUPTED", nextAttemptAt: undefined, updatedAt: new Date().toISOString() });
+      await transactionDone(tx);
+    } finally { db.close(); }
+  },
   async update(id: string, tenantId: string, userId: string, patch: Partial<OfflineOperation>) {
     return withStore(stores.operations, "readwrite", async store => {
       const current = await requestResult(store.get(id) as IDBRequest<OfflineOperation | undefined>);
@@ -77,6 +93,7 @@ export const offlineStore = {
   markSyncing(id: string, tenantId: string, userId: string) { return this.update(id, tenantId, userId, { status: "SYNCING", lastAttemptAt: new Date().toISOString() }); },
   markSynced(id: string, tenantId: string, userId: string, serverResultId?: string) { return this.update(id, tenantId, userId, { status: "SYNCED", syncedAt: new Date().toISOString(), serverResultId }); },
   markFailed(id: string, tenantId: string, userId: string, status: "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "CONFLICT", code: string, attempts: number, nextAttemptAt?: string) { return this.update(id, tenantId, userId, { status, lastErrorCode: code, attemptCount: attempts, nextAttemptAt }); },
+  markAuthRequired(id: string, tenantId: string, userId: string) { return this.update(id, tenantId, userId, { status: "AUTH_REQUIRED", lastErrorCode: "AUTH_REQUIRED", nextAttemptAt: undefined }); },
   async deleteSynced(id: string, tenantId: string, userId: string) {
     const db = await openDatabase();
     try {
