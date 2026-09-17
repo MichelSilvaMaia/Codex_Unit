@@ -112,3 +112,9 @@ SaaS multiempresa para reservas e controle operacional de veículos e equipament
 ## Fase 9
 
 A central `/maintenance` acompanha ordens, diagnósticos, intervenções, histórico e reservas futuras impactadas. A liberação é explícita e transacional; o PostgreSQL impede duas ordens ativas para o mesmo recurso.
+
+## PWA e sincronização inicial (Fase 10 parcial)
+
+O app tem manifesto, ícones e service worker que armazena somente assets públicos. A rota `/sync` exibe as pendências do usuário e tenant ativos. Em manutenção, diagnósticos e intervenções podem ser guardados temporariamente em IndexedDB e enviados depois. O PostgreSQL revalida sessão, tenant, RBAC, estado e versão; um recibo idempotente evita repetir a mutação. Não considere uma operação concluída até a confirmação da sincronização.
+
+Retirada, devolução, assinatura, OTP e evidências **não** estão disponíveis offline nesta entrega. Em produção, o service worker requer HTTPS. Não há suporte iOS declarado sem teste em dispositivo.

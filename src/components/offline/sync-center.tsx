@@ -1,0 +1,19 @@
+"use client";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { checkConnectivity } from "@/lib/offline/connectivity";
+import { offlineStore, type OfflineOperation } from "@/lib/offline/offline-store";
+import { syncNow } from "@/lib/offline/sync-engine";
+
+const labels: Record<string, string> = { PENDING: "Pendente", SYNCING: "Sincronizando", SYNCED: "Confirmada", FAILED_RETRYABLE: "Nova tentativa agendada", FAILED_PERMANENT: "Rejeitada", CONFLICT: "Conflito" };
+export function SyncCenter({ tenantId, userId }: { tenantId: string; userId: string }) {
+  const [rows, setRows] = useState<OfflineOperation[]>([]), [online, setOnline] = useState(false), [running, setRunning] = useState(false), [message, setMessage] = useState("");
+  const refresh = useCallback(async () => { setOnline(await checkConnectivity()); setRows(await offlineStore.getPendingOperations(tenantId, userId).catch(() => [])); }, [tenantId, userId]);
+  useEffect(() => { const timer = window.setTimeout(() => void refresh(), 0); return () => window.clearTimeout(timer); }, [refresh]);
+  async function synchronize() { setRunning(true); try { const result = await syncNow(tenantId, userId); setMessage(result.authRequired ? "Entre novamente para retomar; as pendências permanecem no dispositivo." : `${result.synced} operação(ões) confirmada(s), ${result.conflicts} conflito(s), ${result.failed} falha(s).`); } finally { setRunning(false); await refresh(); } }
+  async function discard(row: OfflineOperation) {
+    if (!window.confirm("Descartar esta operação local rejeitada? Esta ação não pode ser desfeita.")) return;
+    await offlineStore.discardRejected(row.id, tenantId, userId); await refresh();
+  }
+  return <div className="grid gap-4"><div className="surface-card flex flex-wrap items-center justify-between gap-3"><div><strong>{online ? "Conectado" : "Sem conexão"}</strong><p className="text-sm text-muted-foreground">Somente a confirmação do servidor conclui uma operação.</p></div><button onClick={synchronize} disabled={!online || running} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{running ? "Sincronizando…" : "Sincronizar agora"}</button></div>{message&&<p role="status" className="text-sm">{message}</p>}{rows.length===0?<div className="surface-card">Nenhuma pendência local para esta conta e empresa.</div>:rows.map(row=><article className="surface-card" key={row.id}><div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{row.operationType === "MAINTENANCE_ADD_DIAGNOSIS" ? "Diagnóstico" : "Intervenção"}</strong><p className="text-sm text-muted-foreground">{row.payload.description}</p><p className="mt-2 text-xs text-muted-foreground">Registrado no dispositivo em {new Date(row.createdAt).toLocaleString("pt-BR")}</p></div><span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">{labels[row.status]}</span></div>{row.status==="CONFLICT"&&<p className="mt-3 text-sm text-amber-800">O registro mudou no servidor. <Link href={`/maintenance/${row.aggregateId}`} className="underline">Revise o estado atual</Link> antes de registrar novamente. Não houve mesclagem automática.</p>}{row.status==="FAILED_PERMANENT"&&<p className="mt-3 text-sm text-destructive">O servidor rejeitou a operação ({row.lastErrorCode}). Revise permissões e dados.</p>}{["CONFLICT","FAILED_PERMANENT"].includes(row.status)&&<button onClick={() => discard(row)} className="mt-3 text-sm font-semibold text-destructive underline">Descartar operação local</button>}</article>)}</div>;
+}

@@ -3,6 +3,7 @@ import { Inter, Manrope } from "next/font/google";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import { PwaRegister } from "@/components/offline/pwa-register";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-heading" });
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="pt-BR">
       <body className={`${inter.variable} ${manrope.variable} min-h-screen font-[var(--font-body)] antialiased`}>
         {children}
+        <PwaRegister />
       </body>
     </html>
   );

@@ -280,6 +280,7 @@ model User {
   maintenanceActivities     MaintenanceActivity[]      @relation("MaintenancePerformer")
   maintenanceEvidence       MaintenanceEvidence[]      @relation("MaintenanceEvidenceUploader")
   maintenanceHistory        MaintenanceStatusHistory[] @relation("MaintenanceStatusActor")
+  clientOperations          ClientOperation[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 }
@@ -322,6 +323,7 @@ model Tenant {
   maintenanceActivities    MaintenanceActivity[]
   maintenanceEvidence      MaintenanceEvidence[]
   maintenanceHistory       MaintenanceStatusHistory[]
+  clientOperations         ClientOperation[]
   timeZone                 String                     @default("America/Sao_Paulo")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
@@ -787,6 +789,7 @@ model MaintenanceOrder {
   description        String
   priority           MaintenancePriority        @default(NORMAL)
   status             MaintenanceStatus          @default(OPEN)
+  version            Int                        @default(1)
   openedAt           DateTime                   @default(now()) @db.Timestamptz(3)
   openedByUserId     String                     @db.Uuid
   diagnosedAt        DateTime?                  @db.Timestamptz(3)
@@ -816,6 +819,26 @@ model MaintenanceOrder {
   @@index([tenantId, priority])
   @@index([tenantId, sourceReturnId])
   @@index([tenantId, sourceReturnItemId])
+}
+
+model ClientOperation {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @db.Uuid
+  userId            String   @db.Uuid
+  clientOperationId String   @db.Uuid
+  deviceId          String   @db.Uuid
+  operationType     String
+  aggregateType     String
+  aggregateId       String   @db.Uuid
+  payloadHash       String
+  resultReference   String?  @db.Uuid
+  receivedAt        DateTime @default(now()) @db.Timestamptz(3)
+  processedAt       DateTime @default(now()) @db.Timestamptz(3)
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, clientOperationId])
+  @@index([tenantId, aggregateId, processedAt])
 }
 
 model MaintenanceDiagnosis {

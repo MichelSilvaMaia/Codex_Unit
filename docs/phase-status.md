@@ -49,3 +49,7 @@ Devolução integral, inspeção por recurso, evidência de irregularidade, reen
 - Central de manutenção responsiva e modernização do shell visual compartilhado.
 
 FASE 7.1 permanece **PARCIAL — homologação externa Zenvia/Resend pendente**.
+
+## Fase 10 — PARCIAL: infraestrutura PWA e sincronização inicial de manutenção
+
+Manifesto, service worker de shell público, IndexedDB versionado, fila com Web Locks, indicador de conectividade, central `/sync`, recibo idempotente PostgreSQL e conflito por versão foram implementados. Apenas diagnóstico/intervenção de manutenção podem ser guardados no dispositivo. Retirada, devolução, assinatura, evidências e OTP não possuem fluxo offline aprovado nesta entrega. A inspeção visual automática em desktop/tablet/mobile e homologação de instalação também estão pendentes. Fase 7.1 continua PARCIAL independentemente desta fase.
