@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { offlineStore, type OfflineOperation } from "@/lib/offline/offline-store";
 
-export function OfflineMaintenanceForm({ tenantId, userId, orderId, expectedVersion }: { tenantId: string; userId: string; orderId: string; expectedVersion: number }) {
+export function OfflineMaintenanceForm({ tenantId, userId, orderId, expectedVersion, canDiagnose, canPerform }: { tenantId: string; userId: string; orderId: string; expectedVersion: number; canDiagnose: boolean; canPerform: boolean }) {
   const [message, setMessage] = useState("");
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,5 +19,5 @@ export function OfflineMaintenanceForm({ tenantId, userId, orderId, expectedVers
       form.reset(); setMessage("Registrado neste dispositivo. Ainda não foi confirmado pelo servidor; abra Sincronização para acompanhar.");
     } catch { setMessage("Não foi possível salvar neste dispositivo. Verifique o armazenamento antes de sair da página."); }
   }
-  return <form onSubmit={save} className="surface-card"><h2>Registro temporário sem conexão</h2><p className="mt-2 text-sm text-muted-foreground">Diagnóstico ou intervenção fica pendente no dispositivo. Não altera o servidor até receber confirmação da sincronização.</p><div className="mt-4 grid gap-3 sm:grid-cols-[12rem_1fr_auto]"><select name="type" className="h-10 rounded-lg border px-3 text-sm"><option value="DIAGNOSIS">Diagnóstico</option><option value="INSPECTION">Inspeção</option><option value="REPAIR">Reparo</option><option value="CLEANING">Limpeza</option><option value="TEST">Teste</option><option value="ADJUSTMENT">Ajuste</option><option value="OTHER">Outro</option></select><input name="description" className="h-10 rounded-lg border px-3 text-sm" placeholder="O que foi observado ou feito" required/><button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Guardar no dispositivo</button></div>{message && <p role="status" className="mt-3 text-sm">{message}</p>}</form>;
+  return <form onSubmit={save} className="surface-card"><h2>Registro temporário sem conexão</h2><p className="mt-2 text-sm text-muted-foreground">Diagnóstico ou intervenção fica pendente no dispositivo. Não altera o servidor até receber confirmação da sincronização.</p><div className="mt-4 grid gap-3 sm:grid-cols-[12rem_1fr_auto]"><select name="type" className="h-10 rounded-lg border px-3 text-sm">{canDiagnose && <option value="DIAGNOSIS">Diagnóstico</option>}{canPerform && <><option value="INSPECTION">Inspeção</option><option value="REPAIR">Reparo</option><option value="CLEANING">Limpeza</option><option value="TEST">Teste</option><option value="ADJUSTMENT">Ajuste</option><option value="OTHER">Outro</option></>}</select><input name="description" className="h-10 rounded-lg border px-3 text-sm" placeholder="O que foi observado ou feito" required/><button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Guardar no dispositivo</button></div>{message && <p role="status" className="mt-3 text-sm">{message}</p>}</form>;
 }
