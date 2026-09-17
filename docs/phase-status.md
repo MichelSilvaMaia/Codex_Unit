@@ -59,3 +59,9 @@ Manifesto, service worker de shell público, IndexedDB versionado, fila com Web 
 Sob o mutex entre abas, operações interrompidas em `SYNCING` retornam a `FAILED_RETRYABLE` antes do envio. Resposta 401 mantém a intenção local em `AUTH_REQUIRED`, sem backoff nem descarte; uma nova sincronização após login pode retomá-la. A central mostra tentativas, último erro e quantidade de anexos locais pendentes. Os 101 testes anteriores continuam como baseline; há testes adicionais para recuperação/401 e exclusão entre abas.
 
 **Ainda PARCIAL:** não foi implementado nem homologado o fluxo offline completo de Pickup/Return, assinatura, upload de evidências, quota/persistência, snapshots privados, instalação PWA, visual QA ou modo avião. Nenhuma conclusão de custódia deve ser inferida de uma captura local. A Fase 7.1 permanece PARCIAL pela homologação externa.
+
+### Fase 10.2 — PARCIAL: motor de evidências offline de manutenção
+
+Captura Blob/SHA-256 com ownership tenant/user, upgrade IndexedDB v1→v2, estados de upload, retry/401/403/409, recibo idempotente PostgreSQL e ACK explícito antes do cleanup foram adicionados para `MaintenanceEvidence`. Falha de uma entre N fotos preserva a operação e não repete o domínio. Testes de IndexedDB compatível e PostgreSQL exercitam persistência, isolamento, upgrade, quota, concorrência e replay. Consulte [ADR-034](adr/034-ciclo-anexos-offline-idempotencia.md).
+
+**Fase 10.2 permanece PARCIAL:** os testes usam IndexedDB compatível (`fake-indexeddb`), não Chrome/Edge real; o controlador do navegador não conseguiu acessar a aplicação local, portanto QA visual e fechar/reabrir PWA no dispositivo não foram executados. A compensação de storage externo indisponível ainda precisa de reconciliação operacional. **Fase 10 geral continua PARCIAL:** Pickup/Return/assinatura e homologação PWA/visual/dispositivo real ainda não foram realizados; Fase 7.1 continua PARCIAL pela homologação externa.

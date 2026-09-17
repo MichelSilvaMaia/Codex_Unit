@@ -281,52 +281,54 @@ model User {
   maintenanceEvidence       MaintenanceEvidence[]      @relation("MaintenanceEvidenceUploader")
   maintenanceHistory        MaintenanceStatusHistory[] @relation("MaintenanceStatusActor")
   clientOperations          ClientOperation[]
+  offlineAttachmentReceipts OfflineAttachmentReceipt[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 }
 
 model Tenant {
-  id                       String                     @id @default(uuid()) @db.Uuid
-  legalName                String
-  tradeName                String
-  slug                     String                     @unique
-  status                   TenantStatus               @default(ACTIVE)
-  memberships              TenantMembership[]
-  auditLogs                AuditLog[]
-  roles                    Role[]
-  invitations              TenantInvitation[]
-  units                    Unit[]
-  customers                Customer[]
-  customerContacts         CustomerContact[]
-  customerAddresses        CustomerAddress[]
-  contracts                Contract[]
-  contractUnits            ContractUnit[]
-  resourceCategories       ResourceCategory[]
-  resources                Resource[]
-  reservations             Reservation[]
-  reservationItems         ReservationItem[]
-  reservationStatusHistory ReservationStatusHistory[]
-  reservationApprovals     ReservationApproval[]
-  pickups                  ReservationPickup[]
-  pickupItems              ReservationPickupItem[]
-  operationalEvidence      OperationalEvidence[]
-  custodyEvents            ResourceCustodyEvent[]
-  pickupAcceptances        PickupAcceptance[]
-  otpChallenges            PickupOtpChallenge[]
-  otpDeliveryAttempts      OtpDeliveryAttempt[]
-  acceptanceSignatures     AcceptanceSignature[]
-  returns                  ReservationReturn[]
-  returnItems              ReservationReturnItem[]
-  returnEvidence           ReturnEvidence[]
-  maintenanceOrders        MaintenanceOrder[]
-  maintenanceDiagnoses     MaintenanceDiagnosis[]
-  maintenanceActivities    MaintenanceActivity[]
-  maintenanceEvidence      MaintenanceEvidence[]
-  maintenanceHistory       MaintenanceStatusHistory[]
-  clientOperations         ClientOperation[]
-  timeZone                 String                     @default("America/Sao_Paulo")
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
+  id                        String                     @id @default(uuid()) @db.Uuid
+  legalName                 String
+  tradeName                 String
+  slug                      String                     @unique
+  status                    TenantStatus               @default(ACTIVE)
+  memberships               TenantMembership[]
+  auditLogs                 AuditLog[]
+  roles                     Role[]
+  invitations               TenantInvitation[]
+  units                     Unit[]
+  customers                 Customer[]
+  customerContacts          CustomerContact[]
+  customerAddresses         CustomerAddress[]
+  contracts                 Contract[]
+  contractUnits             ContractUnit[]
+  resourceCategories        ResourceCategory[]
+  resources                 Resource[]
+  reservations              Reservation[]
+  reservationItems          ReservationItem[]
+  reservationStatusHistory  ReservationStatusHistory[]
+  reservationApprovals      ReservationApproval[]
+  pickups                   ReservationPickup[]
+  pickupItems               ReservationPickupItem[]
+  operationalEvidence       OperationalEvidence[]
+  custodyEvents             ResourceCustodyEvent[]
+  pickupAcceptances         PickupAcceptance[]
+  otpChallenges             PickupOtpChallenge[]
+  otpDeliveryAttempts       OtpDeliveryAttempt[]
+  acceptanceSignatures      AcceptanceSignature[]
+  returns                   ReservationReturn[]
+  returnItems               ReservationReturnItem[]
+  returnEvidence            ReturnEvidence[]
+  maintenanceOrders         MaintenanceOrder[]
+  maintenanceDiagnoses      MaintenanceDiagnosis[]
+  maintenanceActivities     MaintenanceActivity[]
+  maintenanceEvidence       MaintenanceEvidence[]
+  maintenanceHistory        MaintenanceStatusHistory[]
+  clientOperations          ClientOperation[]
+  offlineAttachmentReceipts OfflineAttachmentReceipt[]
+  timeZone                  String                     @default("America/Sao_Paulo")
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
 }
 
 model Unit {
@@ -839,6 +841,30 @@ model ClientOperation {
 
   @@unique([tenantId, clientOperationId])
   @@index([tenantId, aggregateId, processedAt])
+}
+
+model OfflineAttachmentReceipt {
+  id                String                  @id @default(uuid()) @db.Uuid
+  tenantId          String                  @db.Uuid
+  userId            String                  @db.Uuid
+  attachmentId      String                  @db.Uuid
+  clientOperationId String                  @db.Uuid
+  deviceId          String                  @db.Uuid
+  aggregateId       String                  @db.Uuid
+  checksum          String
+  mimeType          String
+  size              Int
+  evidenceType      MaintenanceEvidenceType
+  status            String
+  evidenceId        String?                 @db.Uuid
+  storageKey        String
+  claimedAt         DateTime                @default(now()) @db.Timestamptz(3)
+  confirmedAt       DateTime?               @db.Timestamptz(3)
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, attachmentId])
+  @@index([tenantId, aggregateId])
 }
 
 model MaintenanceDiagnosis {

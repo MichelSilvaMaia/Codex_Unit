@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const store = vi.hoisted(() => ({
-  recoverInterrupted: vi.fn(), getPendingOperations: vi.fn(), markSyncing: vi.fn(),
+  recoverInterrupted: vi.fn(), recoverUploads: vi.fn(), getPendingOperations: vi.fn(), getAttachments: vi.fn(async () => []), markSyncing: vi.fn(),
   markAuthRequired: vi.fn(), markFailed: vi.fn(), markSynced: vi.fn(),
   resolveDependency: vi.fn(), deleteSynced: vi.fn(),
 }));
