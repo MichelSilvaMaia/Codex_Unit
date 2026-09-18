@@ -600,6 +600,7 @@ model ReservationItem {
 
 model ReservationPickup {
   id                String                  @id @default(uuid()) @db.Uuid
+  version           Int                     @default(1)
   tenantId          String                  @db.Uuid
   reservationId     String                  @db.Uuid
   status            PickupStatus            @default(IN_PROGRESS)

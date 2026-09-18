@@ -18,6 +18,7 @@ export type PickupDraft = {
 export type PickupSnapshot = {
   tenantId: string; userId: string; pickupId: string; reservationId: string; reservationCode: string;
   serverUpdatedAt: string; pickupStatus: "IN_PROGRESS"; cachedAt: string; schemaVersion: 1;
+  expectedVersion: number;
   recipientName: string; recipientDocument: string; recipientPhone: string; vehiclePlate: string; notes: string;
   items: { pickupItemId: string; resourceId: string; resourceCode: string; resourceName: string; condition: PickupDraft["items"][number]["condition"]; notes: string }[];
   termsVersion: string; termsHash: string; termsSnapshot: string;
@@ -61,7 +62,7 @@ async function withStore<T>(name: string, mode: IDBTransactionMode, action: (sto
 }
 export const offlineStore = {
   async cachePickup(snapshot: PickupSnapshot) {
-    if (snapshot.pickupStatus !== "IN_PROGRESS" || snapshot.schemaVersion !== 1 || !snapshot.items.length) throw new Error("Snapshot de retirada inválido.");
+    if (snapshot.pickupStatus !== "IN_PROGRESS" || snapshot.schemaVersion !== 1 || !Number.isSafeInteger(snapshot.expectedVersion) || snapshot.expectedVersion < 1 || !snapshot.items.length) throw new Error("Snapshot de retirada inválido.");
     return withStore(stores.pickups, "readwrite", async store => {
       const key = [snapshot.tenantId, snapshot.userId, snapshot.pickupId];
       const current = await requestResult(store.get(key) as IDBRequest<PickupSnapshot | undefined>);

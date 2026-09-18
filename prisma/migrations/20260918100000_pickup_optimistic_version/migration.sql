@@ -1,0 +1,1 @@
+ALTER TABLE "ReservationPickup" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 1;
