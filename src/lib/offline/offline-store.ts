@@ -1,15 +1,15 @@
 export type OfflineStatus = "PENDING" | "SYNCING" | "SYNCED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "CONFLICT" | "AUTH_REQUIRED";
 export type OfflineOperation = {
   id: string; clientOperationId: string; tenantId: string; userId: string; deviceId: string;
-  operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY" | "MAINTENANCE_ADD_EVIDENCE";
-  aggregateType: "MaintenanceOrder"; aggregateId: string; expectedVersion: number;
+  operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY" | "MAINTENANCE_ADD_EVIDENCE" | "PICKUP_ATTACHMENTS";
+  aggregateType: "MaintenanceOrder" | "ReservationPickup"; aggregateId: string; expectedVersion: number;
   payload: { description: string; type?: "INSPECTION" | "REPAIR" | "CLEANING" | "TEST" | "ADJUSTMENT" | "OTHER" };
   dependsOnOperationIds: string[]; status: OfflineStatus; attemptCount: number;
   createdAt: string; updatedAt: string; lastAttemptAt?: string; nextAttemptAt?: string;
   lastErrorCode?: string; serverResultId?: string; syncedAt?: string; domainConfirmed?: boolean; schemaVersion: 1;
 };
 export type AttachmentStatus = "LOCAL" | "PENDING_UPLOAD" | "UPLOADING" | "SERVER_CONFIRMED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "AUTH_REQUIRED" | "CONFLICT";
-export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; aggregateType: "MaintenanceOrder"; aggregateId: string; purpose: "MAINTENANCE_EVIDENCE"; type: "DAMAGE" | "DIAGNOSIS" | "REPAIR" | "TEST_RESULT" | "FINAL_CONDITION" | "OTHER"; blob: Blob; mimeType: string; size: number; checksum: string; createdAt: string; updatedAt: string; status: AttachmentStatus; attemptCount: number; lastAttemptAt?: string; nextAttemptAt?: string; lastErrorCode?: string; serverEvidenceId?: string; confirmedAt?: string; schemaVersion: 2 };
+export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; aggregateType: "MaintenanceOrder" | "ReservationPickup"; aggregateId: string; purpose: "MAINTENANCE_EVIDENCE" | "PICKUP_EVIDENCE" | "PICKUP_SIGNATURE"; type: "DAMAGE" | "DIAGNOSIS" | "REPAIR" | "TEST_RESULT" | "FINAL_CONDITION" | "OTHER" | "DIVERGENCE" | "RESOURCE_IDENTIFICATION" | "OUTPUT_CONDITION" | "RETURN_CONDITION" | "RETURN_DAMAGE" | "MISSING_COMPONENT" | "SIGNATURE"; blob: Blob; mimeType: string; size: number; checksum: string; pickupItemId?: string; expectedVersion?: number; termsVersion?: string; termsHash?: string; capturedAtDevice?: string; width?: number; height?: number; createdAt: string; updatedAt: string; status: AttachmentStatus; attemptCount: number; lastAttemptAt?: string; nextAttemptAt?: string; lastErrorCode?: string; serverEvidenceId?: string; serverAcceptanceId?: string; confirmedAt?: string; schemaVersion: 2 };
 export type PickupDraft = {
   recipientName: string; recipientDocument: string; recipientPhone: string; vehiclePlate: string; notes: string;
   items: { pickupItemId: string; condition: "OK" | "DAMAGED" | "DIVERGENT" | "OTHER"; notes: string }[];
@@ -22,7 +22,7 @@ export type PickupSnapshot = {
   recipientName: string; recipientDocument: string; recipientPhone: string; vehiclePlate: string; notes: string;
   items: { pickupItemId: string; resourceId: string; resourceCode: string; resourceName: string; condition: PickupDraft["items"][number]["condition"]; notes: string }[];
   termsVersion: string; termsHash: string; termsSnapshot: string;
-  canInspect: boolean; canComplete: boolean; canSign: boolean;
+  canInspect: boolean; canAddEvidence: boolean; canComplete: boolean; canSign: boolean;
   draft?: PickupDraft;
 };
 type Metadata = { key: string; value: string };
@@ -63,13 +63,19 @@ async function withStore<T>(name: string, mode: IDBTransactionMode, action: (sto
 export const offlineStore = {
   async cachePickup(snapshot: PickupSnapshot) {
     if (snapshot.pickupStatus !== "IN_PROGRESS" || snapshot.schemaVersion !== 1 || !Number.isSafeInteger(snapshot.expectedVersion) || snapshot.expectedVersion < 1 || !snapshot.items.length) throw new Error("Snapshot de retirada inválido.");
-    return withStore(stores.pickups, "readwrite", async store => {
+    const db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.pickups, stores.operations], "readwrite"), store = tx.objectStore(stores.pickups);
       const key = [snapshot.tenantId, snapshot.userId, snapshot.pickupId];
       const current = await requestResult(store.get(key) as IDBRequest<PickupSnapshot | undefined>);
-      // Never silently replace a draft's original optimistic token or terms.
-      if (current?.draft) return current;
-      store.put(snapshot); return snapshot;
-    });
+      const operations = await requestResult(tx.objectStore(stores.operations).index("owner").getAll([snapshot.tenantId, snapshot.userId]) as IDBRequest<OfflineOperation[]>);
+      const hasPickupWork = operations.some(row => row.aggregateType === "ReservationPickup" && row.aggregateId === snapshot.pickupId);
+      // Keep the exact terms/version used by any local draft, evidence or signature.
+      if (hasPickupWork && !current) throw new Error("Anexos locais sem snapshot original: revisão necessária.");
+      if (!current?.draft && !hasPickupWork) store.put(snapshot);
+      await transactionDone(tx);
+      return current?.draft || hasPickupWork ? current! : snapshot;
+    } finally { db.close(); }
   },
   async getPickupSnapshot(pickupId: string, tenantId: string, userId: string) {
     return withStore(stores.pickups, "readonly", async store => requestResult(store.get([tenantId, userId, pickupId]) as IDBRequest<PickupSnapshot | undefined>));
@@ -93,7 +99,7 @@ export const offlineStore = {
     } finally { db.close(); }
   },
   async saveOperation(operation: OfflineOperation, attachments: OfflineAttachment[] = []) {
-    if (!operation.id || operation.id !== operation.clientOperationId || operation.schemaVersion !== 1 || attachments.some(a => a.operationId !== operation.id || a.tenantId !== operation.tenantId || a.userId !== operation.userId || a.aggregateId !== operation.aggregateId || a.size !== a.blob.size || a.schemaVersion !== 2)) throw new Error("Operação local inválida.");
+    if (!operation.id || operation.id !== operation.clientOperationId || operation.schemaVersion !== 1 || attachments.some(a => a.operationId !== operation.id || a.tenantId !== operation.tenantId || a.userId !== operation.userId || a.aggregateId !== operation.aggregateId || a.aggregateType !== operation.aggregateType || a.size !== a.blob.size || a.schemaVersion !== 2)) throw new Error("Operação local inválida.");
     const db = await openDatabase();
     try {
       const tx = db.transaction([stores.operations, stores.attachments, stores.metadata], "readwrite");
@@ -194,9 +200,22 @@ export const offlineStore = {
     try {
       const tx = db.transaction([stores.operations, stores.attachments], "readwrite");
       const operation = await requestResult(tx.objectStore(stores.operations).get(attachment.operationId) as IDBRequest<OfflineOperation | undefined>);
-      if (!operation || operation.tenantId !== attachment.tenantId || operation.userId !== attachment.userId || operation.aggregateId !== attachment.aggregateId || ["SYNCED", "CONFLICT", "FAILED_PERMANENT"].includes(operation.status)) throw new Error("Operação local incompatível.");
+      if (!operation || operation.tenantId !== attachment.tenantId || operation.userId !== attachment.userId || operation.aggregateId !== attachment.aggregateId || operation.aggregateType !== attachment.aggregateType || ["SYNCED", "CONFLICT", "FAILED_PERMANENT"].includes(operation.status)) throw new Error("Operação local incompatível.");
       if (await requestResult(tx.objectStore(stores.attachments).get(attachment.id))) throw new Error("Identificador da evidência já existe.");
       tx.objectStore(stores.attachments).add(attachment); await transactionDone(tx);
+    } finally { db.close(); }
+  },
+  async removeLocalAttachment(id: string, tenantId: string, userId: string) {
+    const db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.operations, stores.attachments], "readwrite");
+      const attachments = tx.objectStore(stores.attachments);
+      const attachment = await requestResult(attachments.get(id) as IDBRequest<OfflineAttachment | undefined>);
+      if (!attachment || attachment.tenantId !== tenantId || attachment.userId !== userId || attachment.purpose === "PICKUP_SIGNATURE" || !["LOCAL", "PENDING_UPLOAD"].includes(attachment.status)) throw new Error("Somente uma evidência ainda local pode ser removida.");
+      const operation = await requestResult(tx.objectStore(stores.operations).get(attachment.operationId) as IDBRequest<OfflineOperation | undefined>);
+      if (!operation || operation.tenantId !== tenantId || operation.userId !== userId || operation.domainConfirmed || operation.status === "SYNCING") throw new Error("Evidência já submetida à sincronização.");
+      attachments.delete(id);
+      await transactionDone(tx);
     } finally { db.close(); }
   },
   async getStorageUsage() { return navigator.storage?.estimate?.() ?? { usage: undefined, quota: undefined }; },

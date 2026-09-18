@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { capturePickupSignatureAction } from "@/app/acceptance-actions";
 import { Button } from "@/components/ui/button";
 
-export function SignaturePad({ pickupId }: { pickupId: string }) {
+export function SignaturePad({ pickupId, onOfflineSave }: { pickupId: string; onOfflineSave?: (blob: Blob, width: number, height: number) => Promise<void> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasInk, setHasInk] = useState(false);
@@ -49,6 +49,11 @@ export function SignaturePad({ pickupId }: { pickupId: string }) {
   async function submit(form: FormData) {
     if (!hasInk) return;
     const canvas = canvasRef.current!;
+    if (onOfflineSave) {
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error("Não foi possível gerar o PNG.")), "image/png"));
+      await onOfflineSave(blob, canvas.width, canvas.height);
+      return;
+    }
     form.set("signature", canvas.toDataURL("image/png"));
     form.set("width", String(canvas.width));
     form.set("height", String(canvas.height));
@@ -72,7 +77,7 @@ export function SignaturePad({ pickupId }: { pickupId: string }) {
       />
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={clear}>Limpar</Button>
-        <Button type="submit" disabled={!hasInk}>Registrar aceite</Button>
+        <Button type="submit" disabled={!hasInk}>{onOfflineSave ? "Guardar assinatura neste dispositivo" : "Registrar aceite"}</Button>
       </div>
     </form>
   );

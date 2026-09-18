@@ -6,7 +6,7 @@ import { offlineStore, type PickupDraft, type PickupSnapshot } from "@/lib/offli
 const dbName = "codex-unit-offline";
 const request = <T>(req: IDBRequest<T>): Promise<T> => new Promise((resolve, reject) => { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
 function snapshot(): PickupSnapshot {
-  return { tenantId: randomUUID(), userId: randomUUID(), pickupId: randomUUID(), reservationId: randomUUID(), reservationCode: "R-1", serverUpdatedAt: "2026-09-18T00:00:00.000Z", expectedVersion: 1, pickupStatus: "IN_PROGRESS", cachedAt: "2026-09-18T00:00:00.000Z", schemaVersion: 1, recipientName: "Pessoa Original", recipientDocument: "", recipientPhone: "", vehiclePlate: "", notes: "", items: [{ pickupItemId: randomUUID(), resourceId: randomUUID(), resourceCode: "VEH-1", resourceName: "Veículo", condition: "OK", notes: "" }], termsVersion: "pickup-acceptance-v1", termsHash: "a".repeat(64), termsSnapshot: "Termo original", canInspect: true, canComplete: true, canSign: true };
+  return { tenantId: randomUUID(), userId: randomUUID(), pickupId: randomUUID(), reservationId: randomUUID(), reservationCode: "R-1", serverUpdatedAt: "2026-09-18T00:00:00.000Z", expectedVersion: 1, pickupStatus: "IN_PROGRESS", cachedAt: "2026-09-18T00:00:00.000Z", schemaVersion: 1, recipientName: "Pessoa Original", recipientDocument: "", recipientPhone: "", vehiclePlate: "", notes: "", items: [{ pickupItemId: randomUUID(), resourceId: randomUUID(), resourceCode: "VEH-1", resourceName: "Veículo", condition: "OK", notes: "" }], termsVersion: "pickup-acceptance-v1", termsHash: "a".repeat(64), termsSnapshot: "Termo original", canInspect: true, canAddEvidence: true, canComplete: true, canSign: true };
 }
 describe("offline pickup snapshot v3", () => {
   beforeEach(async () => { await request(indexedDB.deleteDatabase(dbName)); });
@@ -30,6 +30,14 @@ describe("offline pickup snapshot v3", () => {
     const original = snapshot();
     await expect(offlineStore.cachePickup({ ...original, expectedVersion: 0 })).rejects.toThrow();
     await expect(offlineStore.cachePickup({ ...original, expectedVersion: Number.NaN })).rejects.toThrow();
+  });
+  it("keeps original terms and version when attachments exist without a saved draft", async () => {
+    const original = snapshot(); await offlineStore.cachePickup(original);
+    const id = randomUUID(), now = new Date().toISOString();
+    await offlineStore.saveOperation({ id, clientOperationId: id, tenantId: original.tenantId, userId: original.userId, deviceId: randomUUID(), operationType: "PICKUP_ATTACHMENTS", aggregateType: "ReservationPickup", aggregateId: original.pickupId, expectedVersion: original.expectedVersion, payload: { description: "Anexos de retirada" }, dependsOnOperationIds: [], status: "PENDING", attemptCount: 0, createdAt: now, updatedAt: now, schemaVersion: 1 });
+    const retained = await offlineStore.cachePickup({ ...original, expectedVersion: 2, termsHash: "b".repeat(64) });
+    expect(retained.expectedVersion).toBe(1);
+    expect(retained.termsHash).toBe(original.termsHash);
   });
   it("upgrades v2 while preserving maintenance operations and Blobs", async () => {
     const legacy = await new Promise<IDBDatabase>((resolve, reject) => { const req = indexedDB.open(dbName, 2); req.onupgradeneeded = () => { const db = req.result; const operations = db.createObjectStore("offlineOperations", { keyPath: "id" }); operations.createIndex("owner", ["tenantId", "userId"]); const attachments = db.createObjectStore("offlineAttachments", { keyPath: "id" }); attachments.createIndex("operationId", "operationId"); db.createObjectStore("offlineMetadata", { keyPath: "key" }); }; req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
