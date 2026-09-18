@@ -1,12 +1,12 @@
 export type OfflineStatus = "PENDING" | "SYNCING" | "SYNCED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "CONFLICT" | "AUTH_REQUIRED";
 export type OfflineOperation = {
   id: string; clientOperationId: string; tenantId: string; userId: string; deviceId: string;
-  operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY" | "MAINTENANCE_ADD_EVIDENCE" | "PICKUP_ATTACHMENTS";
+  operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY" | "MAINTENANCE_ADD_EVIDENCE" | "PICKUP_ATTACHMENTS" | "PICKUP_COMPLETE";
   aggregateType: "MaintenanceOrder" | "ReservationPickup"; aggregateId: string; expectedVersion: number;
-  payload: { description: string; type?: "INSPECTION" | "REPAIR" | "CLEANING" | "TEST" | "ADJUSTMENT" | "OTHER" };
+  payload: { description: string; type?: "INSPECTION" | "REPAIR" | "CLEANING" | "TEST" | "ADJUSTMENT" | "OTHER"; inspection?: PickupDraft };
   dependsOnOperationIds: string[]; status: OfflineStatus; attemptCount: number;
   createdAt: string; updatedAt: string; lastAttemptAt?: string; nextAttemptAt?: string;
-  lastErrorCode?: string; serverResultId?: string; syncedAt?: string; domainConfirmed?: boolean; schemaVersion: 1;
+  lastErrorCode?: string; serverResultId?: string; serverVersion?: number; syncedAt?: string; domainConfirmed?: boolean; fullAck?: boolean; schemaVersion: 1;
 };
 export type AttachmentStatus = "LOCAL" | "PENDING_UPLOAD" | "UPLOADING" | "SERVER_CONFIRMED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "AUTH_REQUIRED" | "CONFLICT";
 export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; aggregateType: "MaintenanceOrder" | "ReservationPickup"; aggregateId: string; purpose: "MAINTENANCE_EVIDENCE" | "PICKUP_EVIDENCE" | "PICKUP_SIGNATURE"; type: "DAMAGE" | "DIAGNOSIS" | "REPAIR" | "TEST_RESULT" | "FINAL_CONDITION" | "OTHER" | "DIVERGENCE" | "RESOURCE_IDENTIFICATION" | "OUTPUT_CONDITION" | "RETURN_CONDITION" | "RETURN_DAMAGE" | "MISSING_COMPONENT" | "SIGNATURE"; blob: Blob; mimeType: string; size: number; checksum: string; pickupItemId?: string; expectedVersion?: number; termsVersion?: string; termsHash?: string; capturedAtDevice?: string; width?: number; height?: number; createdAt: string; updatedAt: string; status: AttachmentStatus; attemptCount: number; lastAttemptAt?: string; nextAttemptAt?: string; lastErrorCode?: string; serverEvidenceId?: string; serverAcceptanceId?: string; confirmedAt?: string; schemaVersion: 2 };
@@ -87,6 +87,53 @@ export const offlineStore = {
       const next = { ...current, draft };
       store.put(next); return next;
     });
+  },
+  async queuePickupCompletion(pickupId: string, tenantId: string, userId: string) {
+    const deviceId = await this.deviceId(), db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.pickups, stores.operations, stores.attachments], "readwrite");
+      const snapshot = await requestResult(tx.objectStore(stores.pickups).get([tenantId, userId, pickupId]) as IDBRequest<PickupSnapshot | undefined>);
+      if (!snapshot || !snapshot.canComplete || !snapshot.draft || snapshot.draft.recipientName.trim().length < 2 || snapshot.draft.items.length !== snapshot.items.length || snapshot.draft.items.some(item => item.condition !== "OK")) throw new Error("Inspeção integral sem divergências deve estar salva antes da conclusão local.");
+      const operationStore = tx.objectStore(stores.operations);
+      const rows = await requestResult(operationStore.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>);
+      const related = rows.filter(row => row.aggregateType === "ReservationPickup" && row.aggregateId === pickupId);
+      const existing = related.find(row => row.operationType === "PICKUP_COMPLETE");
+      if (existing) { await transactionDone(tx); return existing; }
+      const dependencies = related.filter(row => row.operationType === "PICKUP_ATTACHMENTS");
+      if (!dependencies.length || dependencies.some(row => ["CONFLICT", "FAILED_PERMANENT"].includes(row.status) || row.deviceId !== deviceId)) throw new Error("Anexos ou assinatura rejeitados impedem a conclusão local.");
+      if (dependencies.filter(row => Boolean(row.payload.inspection)).length !== 1) throw new Error("Uma inspeção local única deve preceder os anexos.");
+      const attached = (await Promise.all(dependencies.map(row => requestResult(tx.objectStore(stores.attachments).index("operationId").getAll(row.id) as IDBRequest<OfflineAttachment[]>)))).flat();
+      if (attached.some(row => row.tenantId !== tenantId || row.userId !== userId || ["CONFLICT", "FAILED_PERMANENT"].includes(row.status))) throw new Error("Anexo inválido ou de outra conta.");
+      if (attached.filter(row => row.purpose === "PICKUP_SIGNATURE").length !== 1) throw new Error("Assinatura local obrigatória antes de concluir.");
+      const now = new Date().toISOString(), id = crypto.randomUUID();
+      const operation: OfflineOperation = { id, clientOperationId: id, tenantId, userId, deviceId, operationType: "PICKUP_COMPLETE", aggregateType: "ReservationPickup", aggregateId: pickupId, expectedVersion: snapshot.expectedVersion + 1, payload: { description: "Concluir retirada" }, dependsOnOperationIds: dependencies.map(row => row.id).sort(), status: "PENDING", attemptCount: 0, createdAt: now, updatedAt: now, schemaVersion: 1 };
+      operationStore.add(operation);
+      await transactionDone(tx);
+      return operation;
+    } finally { db.close(); }
+  },
+  async cleanupPickupAfterFullAck(pickupId: string, tenantId: string, userId: string) {
+    const db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.pickups, stores.operations, stores.attachments], "readwrite");
+      const operationStore = tx.objectStore(stores.operations), attachmentStore = tx.objectStore(stores.attachments);
+      const rows = await requestResult(operationStore.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>);
+      const related = rows.filter(row => row.aggregateType === "ReservationPickup" && row.aggregateId === pickupId);
+      if (!related.length) { await transactionDone(tx); return false; }
+      const completion = related.find(row => row.operationType === "PICKUP_COMPLETE");
+      if (!completion || completion.status !== "SYNCED" || !completion.fullAck || completion.serverResultId !== pickupId) throw new Error("FULL ACK ausente: dados locais preservados.");
+      const dependencies = related.filter(row => row.operationType === "PICKUP_ATTACHMENTS");
+      if (!dependencies.length || dependencies.some(row => row.status !== "SYNCED" || !completion.dependsOnOperationIds.includes(row.id))) throw new Error("Dependências sem confirmação: dados locais preservados.");
+      for (const row of dependencies) {
+        const attachments = await requestResult(attachmentStore.index("operationId").getAll(row.id) as IDBRequest<OfflineAttachment[]>);
+        if (attachments.some(item => item.tenantId !== tenantId || item.userId !== userId || item.status !== "SERVER_CONFIRMED" || item.purpose === "PICKUP_SIGNATURE" && !item.serverAcceptanceId)) throw new Error("Anexos sem ACK: dados locais preservados.");
+        for (const item of attachments) attachmentStore.delete(item.id);
+      }
+      for (const row of related) operationStore.delete(row.id);
+      tx.objectStore(stores.pickups).delete([tenantId, userId, pickupId]);
+      await transactionDone(tx);
+      return true;
+    } finally { db.close(); }
   },
   async deviceId() {
     const db = await openDatabase();
@@ -177,7 +224,7 @@ export const offlineStore = {
     try {
       const tx = db.transaction(stores.operations, "readwrite"), store = tx.objectStore(stores.operations);
       const rows = await requestResult(store.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>);
-      for (const row of rows) if (row.dependsOnOperationIds.includes(completedId)) store.put({ ...row, dependsOnOperationIds: row.dependsOnOperationIds.filter(id => id !== completedId) });
+      for (const row of rows) if (row.operationType !== "PICKUP_COMPLETE" && row.dependsOnOperationIds.includes(completedId)) store.put({ ...row, dependsOnOperationIds: row.dependsOnOperationIds.filter(id => id !== completedId) });
       await transactionDone(tx);
     } finally { db.close(); }
   },

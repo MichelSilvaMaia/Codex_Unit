@@ -75,3 +75,9 @@ O IndexedDB v3 preserva snapshots mínimos de Pickup por tenant/usuário e rascu
 ### Fase 10.3.2 — Evidência e aceite offline; conclusão ainda desabilitada
 
 O motor OfflineAttachment agora transporta `PICKUP_EVIDENCE` até `OperationalEvidence` com receipt PostgreSQL e `PICKUP_SIGNATURE` até `PickupAcceptance` + `AcceptanceSignature` com receipt próprio, validação de termos/versão, checksum e constraint de aceite único. A central `/sync` mostra os subestados e mantém os Blobs para a próxima etapa. **Não há `PICKUP_COMPLETE` offline, alteração de Resource ou evento de custódia nesta entrega.** O texto anterior registra o estado histórico da 10.3.1; os itens de evidência e aceite ali pendentes foram abordados nesta 10.3.2. Consulte [ADR-037](adr/037-evidencia-retirada-aceite-offline-idempotente.md). Fase 10.3 e Fase 10 geral permanecem PARCIAIS; Fase 7.1 permanece PARCIAL pela homologação externa.
+
+### Fase 10.3.3 — Conclusão offline funcional; homologação PWA pendente
+
+`PICKUP_COMPLETE` persiste uma intenção local com dependências. A sincronização envia inspeção, evidências e assinatura/aceite antes da conclusão; o servidor revalida os receipts, a reserva, o checklist, o aceite, os recursos e a versão do Pickup. O mesmo `completePickup()` do fluxo online faz a transição e grava o receipt idempotente com FULL ACK na transação PostgreSQL. Retry após resposta perdida recupera o ACK sem duplicar custódia. O IndexedDB remove rascunho, operações e Blobs de foto/assinatura somente após FULL ACK, em uma transação. Consulte [ADR-038](adr/038-offline-pickup-completion-custody-full-ack.md).
+
+**Fase 10.3 permanece PARCIAL:** implementação funcional concluída, porém testes em navegador/PWA e dispositivo real ainda pendentes. **Fase 10 geral permanece PARCIAL.** Fase 7.1 continua PARCIAL pela homologação externa Zenvia/Resend. Return e OTP offline não foram implementados.

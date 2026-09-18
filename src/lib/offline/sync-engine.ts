@@ -1,8 +1,8 @@
 import { checkConnectivity } from "./connectivity";
 import { offlineStore, type OfflineAttachment, type AttachmentStatus, type OfflineOperation } from "./offline-store";
 
-export type SyncSummary = { synced: number; conflicts: number; failed: number; authRequired: boolean; online: boolean };
-const empty = (online: boolean): SyncSummary => ({ synced: 0, conflicts: 0, failed: 0, authRequired: false, online });
+export type SyncSummary = { synced: number; completedPickups: number; conflicts: number; failed: number; authRequired: boolean; online: boolean };
+const empty = (online: boolean): SyncSummary => ({ synced: 0, completedPickups: 0, conflicts: 0, failed: 0, authRequired: false, online });
 let running = false;
 
 async function runQueue(tenantId: string, userId: string): Promise<SyncSummary> {
@@ -13,11 +13,34 @@ async function runQueue(tenantId: string, userId: string): Promise<SyncSummary> 
   await offlineStore.recoverUploads(tenantId, userId, operations.map(o => o.id));
   const available = new Set(operations.filter(o => o.status === "SYNCED").map(o => o.id));
   for (const operation of operations) {
+    if (operation.operationType === "PICKUP_COMPLETE" && operation.status === "SYNCED" && operation.fullAck) {
+      try { await offlineStore.cleanupPickupAfterFullAck(operation.aggregateId, tenantId, userId); } catch { summary.failed++; }
+      continue;
+    }
     if (operation.operationType === "PICKUP_ATTACHMENTS" && operation.status === "SYNCED") continue; // retain Blobs until future full pickup ACK
     if (!["PENDING", "FAILED_RETRYABLE", "AUTH_REQUIRED", "SYNCED"].includes(operation.status)) continue;
     if (operation.nextAttemptAt && new Date(operation.nextAttemptAt).getTime() > Date.now()) continue;
     if (operation.dependsOnOperationIds.some(id => !available.has(id))) continue;
     await offlineStore.markSyncing(operation.id, tenantId, userId);
+    if (operation.operationType === "PICKUP_COMPLETE") {
+      let completionResponse: Response;
+      try { completionResponse = await fetch("/api/sync/pickup-complete", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(operation), cache: "no-store" }); }
+      catch { await retry(operation, "NETWORK_ERROR"); summary.failed++; break; }
+      if (completionResponse.status === 401) { await offlineStore.markAuthRequired(operation.id, tenantId, userId); summary.authRequired = true; break; }
+      if (!completionResponse.ok) {
+        const error = await completionResponse.json().catch(() => ({ code: `HTTP_${completionResponse.status}` })) as { code?: string };
+        if (completionResponse.status === 409) { await offlineStore.markFailed(operation.id, tenantId, userId, "CONFLICT", error.code ?? "CONFLICT", operation.attemptCount + 1); summary.conflicts++; continue; }
+        if (completionResponse.status === 429 || completionResponse.status >= 500) await retry(operation, error.code ?? `HTTP_${completionResponse.status}`);
+        else await offlineStore.markFailed(operation.id, tenantId, userId, "FAILED_PERMANENT", error.code ?? `HTTP_${completionResponse.status}`, operation.attemptCount + 1);
+        summary.failed++; continue;
+      }
+      const ack = await completionResponse.json().catch(() => null) as { clientOperationId?: string; pickupId?: string; pickupStatus?: string; resultReference?: string; completedAt?: string; processedAt?: string; fullAck?: boolean; custodyConfirmed?: boolean; resourceResults?: { resourceId: string; operationalStatus: string }[]; custodyEventIds?: string[] } | null;
+      if (!ack || ack.clientOperationId !== operation.clientOperationId || ack.pickupId !== operation.aggregateId || ack.resultReference !== operation.aggregateId || ack.pickupStatus !== "COMPLETED" || ack.fullAck !== true || ack.custodyConfirmed !== true || !ack.completedAt || !ack.processedAt || !ack.resourceResults?.length || ack.resourceResults.length !== ack.custodyEventIds?.length || ack.resourceResults.some(row => row.operationalStatus !== "IN_USE")) { await retry(operation, "FULL_ACK_INVALID"); summary.failed++; continue; }
+      await offlineStore.update(operation.id, tenantId, userId, { status: "SYNCED", fullAck: true, serverResultId: ack.resultReference, syncedAt: new Date().toISOString() });
+      try { await offlineStore.cleanupPickupAfterFullAck(operation.aggregateId, tenantId, userId); summary.synced++; summary.completedPickups++; }
+      catch { summary.failed++; }
+      continue;
+    }
     let response: Response;
     if (!operation.domainConfirmed) {
       try {
@@ -31,8 +54,8 @@ async function runQueue(tenantId: string, userId: string): Promise<SyncSummary> 
         else await offlineStore.markFailed(operation.id, tenantId, userId, "FAILED_PERMANENT", error.code ?? `HTTP_${response.status}`, operation.attemptCount + 1);
         summary.failed++; continue;
       }
-      const result = await response.json() as { resultReference?: string };
-      await offlineStore.update(operation.id, tenantId, userId, { domainConfirmed: true, serverResultId: result.resultReference });
+      const result = await response.json() as { resultReference?: string; serverVersion?: number };
+      await offlineStore.update(operation.id, tenantId, userId, { domainConfirmed: true, serverResultId: result.resultReference, serverVersion: result.serverVersion });
     }
     const attachments = (await offlineStore.getAttachments(operation.id, tenantId, userId)).sort((a, b) => Number(a.purpose === "PICKUP_SIGNATURE") - Number(b.purpose === "PICKUP_SIGNATURE"));
     let failed = false;
@@ -68,7 +91,7 @@ async function uploadAttachment(operation: OfflineOperation, attachment: Offline
   await offlineStore.updateAttachment(attachment.id, ...owner, "UPLOADING", { lastAttemptAt: new Date().toISOString(), attemptCount: attachment.attemptCount + 1 });
   try {
     const form = new FormData();
-    form.set("metadata", JSON.stringify({ purpose: attachment.purpose, attachmentId: attachment.id, clientOperationId: operation.clientOperationId, deviceId: operation.deviceId, tenantId: operation.tenantId, userId: operation.userId, aggregateId: operation.aggregateId, type: attachment.type, checksum: attachment.checksum, pickupItemId: attachment.pickupItemId, expectedVersion: attachment.expectedVersion, mimeType: attachment.mimeType, size: attachment.size, termsVersion: attachment.termsVersion, termsHash: attachment.termsHash, capturedAtDevice: attachment.capturedAtDevice, width: attachment.width, height: attachment.height }));
+    form.set("metadata", JSON.stringify({ purpose: attachment.purpose, attachmentId: attachment.id, clientOperationId: operation.clientOperationId, deviceId: operation.deviceId, tenantId: operation.tenantId, userId: operation.userId, aggregateId: operation.aggregateId, type: attachment.type, checksum: attachment.checksum, pickupItemId: attachment.pickupItemId, expectedVersion: operation.serverVersion ?? attachment.expectedVersion, mimeType: attachment.mimeType, size: attachment.size, termsVersion: attachment.termsVersion, termsHash: attachment.termsHash, capturedAtDevice: attachment.capturedAtDevice, width: attachment.width, height: attachment.height }));
     form.set("evidence", attachment.blob, "evidence");
     const response = await fetch("/api/sync/maintenance-attachment", { method: "POST", credentials: "same-origin", body: form, cache: "no-store", signal: AbortSignal.timeout(30_000) });
     if (response.ok) {

@@ -835,6 +835,8 @@ model ClientOperation {
   aggregateId       String   @db.Uuid
   payloadHash       String
   resultReference   String?  @db.Uuid
+  resultVersion     Int?
+  resultPayload     Json?
   receivedAt        DateTime @default(now()) @db.Timestamptz(3)
   processedAt       DateTime @default(now()) @db.Timestamptz(3)
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)

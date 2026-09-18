@@ -35,6 +35,7 @@ export async function syncPickupAttachment(context: OperationalContext, raw: unk
   if (checksum !== input.checksum) throw new AppError("CONFLICT", "Checksum da evidência diverge do conteúdo.");
   const operation = await prisma.clientOperation.findUnique({ where: { tenantId_clientOperationId: { tenantId: context.tenantId, clientOperationId: input.clientOperationId } } });
   if (!operation || operation.userId !== context.user.id || operation.deviceId !== input.deviceId || operation.aggregateType !== "ReservationPickup" || operation.aggregateId !== input.aggregateId || operation.operationType !== "PICKUP_ATTACHMENTS") throw new AppError("FORBIDDEN", "Operação original não confirmada.");
+  if (operation.resultVersion !== null && operation.resultVersion !== input.expectedVersion) throw new AppError("CONFLICT", "Versão do anexo incompatível com a inspeção confirmada.");
   const identity = { tenantId: context.tenantId, attachmentId: input.attachmentId };
   const key = `${context.tenantId}/pickup/${input.aggregateId}/offline-${input.attachmentId}`;
   let receipt = await prisma.offlineAttachmentReceipt.findUnique({ where: { tenantId_attachmentId: identity } });

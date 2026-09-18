@@ -30,6 +30,7 @@ export async function syncOfflineSignature(context: OperationalContext, raw: unk
   if (checksum !== input.checksum) throw new AppError("CONFLICT", "Checksum da assinatura diverge do conteúdo.");
   const operation = await prisma.clientOperation.findUnique({ where: { tenantId_clientOperationId: { tenantId: context.tenantId, clientOperationId: input.clientOperationId } } });
   if (!operation || operation.userId !== context.user.id || operation.deviceId !== input.deviceId || operation.aggregateType !== "ReservationPickup" || operation.aggregateId !== input.aggregateId || operation.operationType !== "PICKUP_ATTACHMENTS") throw new AppError("FORBIDDEN", "Operação original não confirmada.");
+  if (operation.resultVersion !== null && operation.resultVersion !== input.expectedVersion) throw new AppError("CONFLICT", "Versão da assinatura incompatível com a inspeção confirmada.");
   const identity = { tenantId: context.tenantId, clientOperationId: input.clientOperationId };
   let receipt = await prisma.offlineSignatureReceipt.findUnique({ where: { tenantId_clientOperationId: identity } });
   const same = (r: NonNullable<typeof receipt>) => {
