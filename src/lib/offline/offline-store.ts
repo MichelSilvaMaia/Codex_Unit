@@ -10,10 +10,24 @@ export type OfflineOperation = {
 };
 export type AttachmentStatus = "LOCAL" | "PENDING_UPLOAD" | "UPLOADING" | "SERVER_CONFIRMED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "AUTH_REQUIRED" | "CONFLICT";
 export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; aggregateType: "MaintenanceOrder"; aggregateId: string; purpose: "MAINTENANCE_EVIDENCE"; type: "DAMAGE" | "DIAGNOSIS" | "REPAIR" | "TEST_RESULT" | "FINAL_CONDITION" | "OTHER"; blob: Blob; mimeType: string; size: number; checksum: string; createdAt: string; updatedAt: string; status: AttachmentStatus; attemptCount: number; lastAttemptAt?: string; nextAttemptAt?: string; lastErrorCode?: string; serverEvidenceId?: string; confirmedAt?: string; schemaVersion: 2 };
+export type PickupDraft = {
+  recipientName: string; recipientDocument: string; recipientPhone: string; vehiclePlate: string; notes: string;
+  items: { pickupItemId: string; condition: "OK" | "DAMAGED" | "DIVERGENT" | "OTHER"; notes: string }[];
+  savedAt: string;
+};
+export type PickupSnapshot = {
+  tenantId: string; userId: string; pickupId: string; reservationId: string; reservationCode: string;
+  serverUpdatedAt: string; pickupStatus: "IN_PROGRESS"; cachedAt: string; schemaVersion: 1;
+  recipientName: string; recipientDocument: string; recipientPhone: string; vehiclePlate: string; notes: string;
+  items: { pickupItemId: string; resourceId: string; resourceCode: string; resourceName: string; condition: PickupDraft["items"][number]["condition"]; notes: string }[];
+  termsVersion: string; termsHash: string; termsSnapshot: string;
+  canInspect: boolean; canComplete: boolean; canSign: boolean;
+  draft?: PickupDraft;
+};
 type Metadata = { key: string; value: string };
 const DB_NAME = "codex-unit-offline";
-const DB_VERSION = 2;
-const stores = { operations: "offlineOperations", attachments: "offlineAttachments", metadata: "offlineMetadata" } as const;
+const DB_VERSION = 3;
+const stores = { operations: "offlineOperations", attachments: "offlineAttachments", metadata: "offlineMetadata", pickups: "offlinePickupSnapshots" } as const;
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
@@ -33,6 +47,10 @@ async function openDatabase(): Promise<IDBDatabase> {
     const attachments = db.objectStoreNames.contains(stores.attachments) ? request.transaction!.objectStore(stores.attachments) : db.createObjectStore(stores.attachments, { keyPath: "id" });
     if (!attachments.indexNames.contains("operationId")) attachments.createIndex("operationId", "operationId");
     if (!db.objectStoreNames.contains(stores.metadata)) db.createObjectStore(stores.metadata, { keyPath: "key" });
+    if (!db.objectStoreNames.contains(stores.pickups)) {
+      const pickups = db.createObjectStore(stores.pickups, { keyPath: ["tenantId", "userId", "pickupId"] });
+      pickups.createIndex("owner", ["tenantId", "userId"]);
+    }
   };
   return requestResult(request);
 }
@@ -42,6 +60,27 @@ async function withStore<T>(name: string, mode: IDBTransactionMode, action: (sto
   finally { db.close(); }
 }
 export const offlineStore = {
+  async cachePickup(snapshot: PickupSnapshot) {
+    if (snapshot.pickupStatus !== "IN_PROGRESS" || snapshot.schemaVersion !== 1 || !snapshot.items.length) throw new Error("Snapshot de retirada inválido.");
+    return withStore(stores.pickups, "readwrite", async store => {
+      const key = [snapshot.tenantId, snapshot.userId, snapshot.pickupId];
+      const current = await requestResult(store.get(key) as IDBRequest<PickupSnapshot | undefined>);
+      // Never silently replace a draft's original optimistic token or terms.
+      if (current?.draft) return current;
+      store.put(snapshot); return snapshot;
+    });
+  },
+  async getPickupSnapshot(pickupId: string, tenantId: string, userId: string) {
+    return withStore(stores.pickups, "readonly", async store => requestResult(store.get([tenantId, userId, pickupId]) as IDBRequest<PickupSnapshot | undefined>));
+  },
+  async savePickupDraft(pickupId: string, tenantId: string, userId: string, draft: PickupDraft) {
+    return withStore(stores.pickups, "readwrite", async store => {
+      const current = await requestResult(store.get([tenantId, userId, pickupId]) as IDBRequest<PickupSnapshot | undefined>);
+      if (!current || current.pickupStatus !== "IN_PROGRESS" || !current.canInspect || draft.items.length !== current.items.length || new Set(draft.items.map(item => item.pickupItemId)).size !== current.items.length || draft.items.some(item => !current.items.some(saved => saved.pickupItemId === item.pickupItemId))) throw new Error("Retirada indisponível ou rascunho inválido neste dispositivo.");
+      const next = { ...current, draft };
+      store.put(next); return next;
+    });
+  },
   async deviceId() {
     const db = await openDatabase();
     try {

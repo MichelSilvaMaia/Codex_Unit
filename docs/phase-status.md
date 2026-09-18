@@ -65,3 +65,9 @@ Sob o mutex entre abas, operações interrompidas em `SYNCING` retornam a `FAILE
 Captura Blob/SHA-256 com ownership tenant/user, upgrade IndexedDB v1→v2, estados de upload, retry/401/403/409, recibo idempotente PostgreSQL e ACK explícito antes do cleanup foram adicionados para `MaintenanceEvidence`. Falha de uma entre N fotos preserva a operação e não repete o domínio. Testes de IndexedDB compatível e PostgreSQL exercitam persistência, isolamento, upgrade, quota, concorrência e replay. Consulte [ADR-034](adr/034-ciclo-anexos-offline-idempotencia.md).
 
 **Fase 10.2 permanece PARCIAL:** os testes usam IndexedDB compatível (`fake-indexeddb`), não Chrome/Edge real; o controlador do navegador não conseguiu acessar a aplicação local, portanto QA visual e fechar/reabrir PWA no dispositivo não foram executados. A compensação de storage externo indisponível ainda precisa de reconciliação operacional. **Fase 10 geral continua PARCIAL:** Pickup/Return/assinatura e homologação PWA/visual/dispositivo real ainda não foram realizados; Fase 7.1 continua PARCIAL pela homologação externa.
+
+### Fase 10.3 — PARCIAL: snapshot e rascunho de retirada
+
+O IndexedDB v3 preserva snapshots mínimos de Pickup por tenant/usuário e rascunhos locais de destinatário/inspeção. A página autenticada informa frescor, exibe termos previamente carregados e deixa claro que o rascunho não confirma saída. Ações online de inspeção, assinatura, OTP e conclusão não são apresentadas sem conectividade. A migração v2→v3 mantém operações e Blobs da manutenção. Consulte [ADR-035](adr/035-retirada-offline-snapshot-rascunho.md).
+
+**Ainda não há conclusão offline de Pickup:** falta versão otimista server-side, upload de evidências de retirada, assinatura idempotente com validação de termos, sincronização da cadeia e cleanup após ACK. Assim, Fases 10, 10.2 e 10.3 continuam PARCIAIS; Fase 7.1 permanece PARCIAL pela homologação externa.
