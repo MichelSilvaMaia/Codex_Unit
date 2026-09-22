@@ -87,3 +87,9 @@ O motor OfflineAttachment agora transporta `PICKUP_EVIDENCE` até `OperationalEv
 Snapshots e rascunhos de Return, inspeção integral, presença, condições e evidências são persistidos no IndexedDB. A sincronização usa versionamento otimista, receipts e o mesmo `completeReturn()` do fluxo online. Somente a transação PostgreSQL conclui Return/Reservation, reentra custódia, aplica disposition e cria MaintenanceOrder. FULL ACK governa a limpeza local e retry após resposta perdida não duplica custódia ou manutenção. Consulte [ADR-039](adr/039-offline-return-custody-maintenance.md).
 
 **Fase 10.4 permanece PARCIAL:** implementação funcional concluída, homologação Chrome/Edge/PWA/dispositivo real pendente. Fase 10 geral permanece PARCIAL e Fase 7.1 segue PARCIAL pela homologação externa.
+
+### Fase 10.5 — PARCIAL: QA real de navegador executado; dispositivo físico pendente
+
+Microsoft Edge real confirmou Manifest, Service Worker ativado/controlando a página, Cache Storage restrito ao shell, IndexedDB `codex-unit-offline` v4, quota, detecção offline e renderização sem overflow do documento em desktop, tablet e mobile. A navegação superior usa rolagem horizontal em telas estreitas (PWA-105-002, MEDIUM). Consulte [matriz de homologação](testing/pwa-offline-homologation.md) e [runbook de dispositivo](testing/pwa-device-manual-runbook.md).
+
+**Fase 10.5 e Fase 10 permanecem PARCIAIS:** instalação/standalone, close/reopen da PWA instalada, modo avião físico, touch, câmera e execução operacional completa de Maintenance/Pickup/Return em dispositivo real ainda não foram comprovados. Fase 7.1 permanece PARCIAL pela homologação externa Zenvia/Resend.
