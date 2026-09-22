@@ -707,6 +707,7 @@ model ReservationReturn {
   reservationId      String                  @db.Uuid
   pickupId           String                  @db.Uuid
   status             ReturnStatus            @default(IN_PROGRESS)
+  version            Int                     @default(1)
   startedAt          DateTime                @default(now()) @db.Timestamptz(3)
   completedAt        DateTime?               @db.Timestamptz(3)
   cancelledAt        DateTime?               @db.Timestamptz(3)
@@ -860,6 +861,7 @@ model OfflineAttachmentReceipt {
   purpose           String    @default("MAINTENANCE_EVIDENCE")
   evidenceType      String
   pickupItemId      String?   @db.Uuid
+  returnItemId      String?   @db.Uuid
   expectedVersion   Int?
   status            String
   evidenceId        String?   @db.Uuid

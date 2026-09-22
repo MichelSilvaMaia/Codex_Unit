@@ -1,15 +1,15 @@
 export type OfflineStatus = "PENDING" | "SYNCING" | "SYNCED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "CONFLICT" | "AUTH_REQUIRED";
 export type OfflineOperation = {
   id: string; clientOperationId: string; tenantId: string; userId: string; deviceId: string;
-  operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY" | "MAINTENANCE_ADD_EVIDENCE" | "PICKUP_ATTACHMENTS" | "PICKUP_COMPLETE";
-  aggregateType: "MaintenanceOrder" | "ReservationPickup"; aggregateId: string; expectedVersion: number;
-  payload: { description: string; type?: "INSPECTION" | "REPAIR" | "CLEANING" | "TEST" | "ADJUSTMENT" | "OTHER"; inspection?: PickupDraft };
+  operationType: "MAINTENANCE_ADD_DIAGNOSIS" | "MAINTENANCE_ADD_ACTIVITY" | "MAINTENANCE_ADD_EVIDENCE" | "PICKUP_ATTACHMENTS" | "PICKUP_COMPLETE" | "RETURN_ATTACHMENTS" | "RETURN_COMPLETE";
+  aggregateType: "MaintenanceOrder" | "ReservationPickup" | "ReservationReturn"; aggregateId: string; expectedVersion: number;
+  payload: { description: string; type?: "INSPECTION" | "REPAIR" | "CLEANING" | "TEST" | "ADJUSTMENT" | "OTHER"; inspection?: PickupDraft; returnInspection?: ReturnDraft };
   dependsOnOperationIds: string[]; status: OfflineStatus; attemptCount: number;
   createdAt: string; updatedAt: string; lastAttemptAt?: string; nextAttemptAt?: string;
   lastErrorCode?: string; serverResultId?: string; serverVersion?: number; syncedAt?: string; domainConfirmed?: boolean; fullAck?: boolean; schemaVersion: 1;
 };
 export type AttachmentStatus = "LOCAL" | "PENDING_UPLOAD" | "UPLOADING" | "SERVER_CONFIRMED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT" | "AUTH_REQUIRED" | "CONFLICT";
-export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; aggregateType: "MaintenanceOrder" | "ReservationPickup"; aggregateId: string; purpose: "MAINTENANCE_EVIDENCE" | "PICKUP_EVIDENCE" | "PICKUP_SIGNATURE"; type: "DAMAGE" | "DIAGNOSIS" | "REPAIR" | "TEST_RESULT" | "FINAL_CONDITION" | "OTHER" | "DIVERGENCE" | "RESOURCE_IDENTIFICATION" | "OUTPUT_CONDITION" | "RETURN_CONDITION" | "RETURN_DAMAGE" | "MISSING_COMPONENT" | "SIGNATURE"; blob: Blob; mimeType: string; size: number; checksum: string; pickupItemId?: string; expectedVersion?: number; termsVersion?: string; termsHash?: string; capturedAtDevice?: string; width?: number; height?: number; createdAt: string; updatedAt: string; status: AttachmentStatus; attemptCount: number; lastAttemptAt?: string; nextAttemptAt?: string; lastErrorCode?: string; serverEvidenceId?: string; serverAcceptanceId?: string; confirmedAt?: string; schemaVersion: 2 };
+export type OfflineAttachment = { id: string; operationId: string; tenantId: string; userId: string; aggregateType: "MaintenanceOrder" | "ReservationPickup" | "ReservationReturn"; aggregateId: string; purpose: "MAINTENANCE_EVIDENCE" | "PICKUP_EVIDENCE" | "PICKUP_SIGNATURE" | "RETURN_EVIDENCE"; type: "DAMAGE" | "DIAGNOSIS" | "REPAIR" | "TEST_RESULT" | "FINAL_CONDITION" | "OTHER" | "DIVERGENCE" | "RESOURCE_IDENTIFICATION" | "OUTPUT_CONDITION" | "RETURN_CONDITION" | "RETURN_DAMAGE" | "MISSING_COMPONENT" | "SIGNATURE"; blob: Blob; mimeType: string; size: number; checksum: string; pickupItemId?: string; returnItemId?: string; expectedVersion?: number; termsVersion?: string; termsHash?: string; capturedAtDevice?: string; width?: number; height?: number; createdAt: string; updatedAt: string; status: AttachmentStatus; attemptCount: number; lastAttemptAt?: string; nextAttemptAt?: string; lastErrorCode?: string; serverEvidenceId?: string; serverAcceptanceId?: string; confirmedAt?: string; schemaVersion: 2 };
 export type PickupDraft = {
   recipientName: string; recipientDocument: string; recipientPhone: string; vehiclePlate: string; notes: string;
   items: { pickupItemId: string; condition: "OK" | "DAMAGED" | "DIVERGENT" | "OTHER"; notes: string }[];
@@ -25,10 +25,17 @@ export type PickupSnapshot = {
   canInspect: boolean; canAddEvidence: boolean; canComplete: boolean; canSign: boolean;
   draft?: PickupDraft;
 };
+export type ReturnDraft = { items: { returnItemId: string; presence: "PRESENT" | "NOT_PRESENT"; condition?: "GOOD" | "DAMAGED" | "MISSING_COMPONENTS" | "DIRTY" | "UNUSABLE" | "OTHER"; disposition?: "MAINTENANCE" | "UNAVAILABLE"; notes: string }[]; savedAt: string };
+export type ReturnSnapshot = {
+  tenantId: string; userId: string; returnId: string; pickupId: string; reservationId: string; reservationCode: string;
+  serverUpdatedAt: string; returnStatus: "IN_PROGRESS"; cachedAt: string; schemaVersion: 1; expectedVersion: number;
+  items: { returnItemId: string; resourceId: string; resourceCode: string; resourceName: string; operationalStatus: "IN_USE"; presence: ReturnDraft["items"][number]["presence"]; condition?: ReturnDraft["items"][number]["condition"]; disposition?: ReturnDraft["items"][number]["disposition"]; notes: string }[];
+  canInspect: boolean; canAddEvidence: boolean; canComplete: boolean; draft?: ReturnDraft;
+};
 type Metadata = { key: string; value: string };
 const DB_NAME = "codex-unit-offline";
-const DB_VERSION = 3;
-const stores = { operations: "offlineOperations", attachments: "offlineAttachments", metadata: "offlineMetadata", pickups: "offlinePickupSnapshots" } as const;
+const DB_VERSION = 4;
+const stores = { operations: "offlineOperations", attachments: "offlineAttachments", metadata: "offlineMetadata", pickups: "offlinePickupSnapshots", returns: "offlineReturnSnapshots" } as const;
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
@@ -51,6 +58,10 @@ async function openDatabase(): Promise<IDBDatabase> {
     if (!db.objectStoreNames.contains(stores.pickups)) {
       const pickups = db.createObjectStore(stores.pickups, { keyPath: ["tenantId", "userId", "pickupId"] });
       pickups.createIndex("owner", ["tenantId", "userId"]);
+    }
+    if (!db.objectStoreNames.contains(stores.returns)) {
+      const returns = db.createObjectStore(stores.returns, { keyPath: ["tenantId", "userId", "returnId"] });
+      returns.createIndex("owner", ["tenantId", "userId"]);
     }
   };
   return requestResult(request);
@@ -133,6 +144,64 @@ export const offlineStore = {
       tx.objectStore(stores.pickups).delete([tenantId, userId, pickupId]);
       await transactionDone(tx);
       return true;
+    } finally { db.close(); }
+  },
+  async cacheReturn(snapshot: ReturnSnapshot) {
+    if (snapshot.returnStatus !== "IN_PROGRESS" || snapshot.schemaVersion !== 1 || !Number.isSafeInteger(snapshot.expectedVersion) || snapshot.expectedVersion < 1 || !snapshot.items.length) throw new Error("Snapshot de devolução inválido.");
+    const db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.returns, stores.operations], "readwrite"), store = tx.objectStore(stores.returns), key = [snapshot.tenantId, snapshot.userId, snapshot.returnId];
+      const current = await requestResult(store.get(key) as IDBRequest<ReturnSnapshot | undefined>);
+      const operations = await requestResult(tx.objectStore(stores.operations).index("owner").getAll([snapshot.tenantId, snapshot.userId]) as IDBRequest<OfflineOperation[]>);
+      const hasWork = operations.some(row => row.aggregateType === "ReservationReturn" && row.aggregateId === snapshot.returnId);
+      if (hasWork && !current) throw new Error("Operações locais sem snapshot original: revisão necessária.");
+      if (!current?.draft && !hasWork) store.put(snapshot);
+      await transactionDone(tx); return current?.draft || hasWork ? current! : snapshot;
+    } finally { db.close(); }
+  },
+  getReturnSnapshot(returnId: string, tenantId: string, userId: string) { return withStore(stores.returns, "readonly", store => requestResult(store.get([tenantId, userId, returnId]) as IDBRequest<ReturnSnapshot | undefined>)); },
+  async saveReturnDraft(returnId: string, tenantId: string, userId: string, draft: ReturnDraft) {
+    return withStore(stores.returns, "readwrite", async store => {
+      const current = await requestResult(store.get([tenantId, userId, returnId]) as IDBRequest<ReturnSnapshot | undefined>);
+      if (!current || !current.canInspect || draft.items.length !== current.items.length || new Set(draft.items.map(item => item.returnItemId)).size !== current.items.length || draft.items.some(item => !current.items.some(saved => saved.returnItemId === item.returnItemId))) throw new Error("Devolução indisponível ou rascunho inválido.");
+      const next = { ...current, draft }; store.put(next); return next;
+    });
+  },
+  async queueReturnAttachments(snapshot: ReturnSnapshot, draft: ReturnDraft, attachments: OfflineAttachment[]) {
+    const now = new Date().toISOString(), id = crypto.randomUUID();
+    const operation: OfflineOperation = { id, clientOperationId: id, tenantId: snapshot.tenantId, userId: snapshot.userId, deviceId: await this.deviceId(), operationType: "RETURN_ATTACHMENTS", aggregateType: "ReservationReturn", aggregateId: snapshot.returnId, expectedVersion: snapshot.expectedVersion, payload: { description: "Inspeção e evidências de devolução", returnInspection: draft }, dependsOnOperationIds: [], status: "PENDING", attemptCount: 0, createdAt: now, updatedAt: now, schemaVersion: 1 };
+    await this.saveOperation(operation, attachments.map(item => ({ ...item, operationId: id }))); return operation;
+  },
+  async queueReturnCompletion(returnId: string, tenantId: string, userId: string) {
+    const deviceId = await this.deviceId(), db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.returns, stores.operations, stores.attachments], "readwrite"), operationStore = tx.objectStore(stores.operations);
+      const snapshot = await requestResult(tx.objectStore(stores.returns).get([tenantId, userId, returnId]) as IDBRequest<ReturnSnapshot | undefined>);
+      if (!snapshot?.draft || !snapshot.canComplete || snapshot.draft.items.some(item => item.presence !== "PRESENT" || !item.condition || item.condition !== "GOOD" && item.notes.trim().length < 3)) throw new Error("Inspeção integral válida deve estar salva antes da conclusão local.");
+      const rows = await requestResult(operationStore.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>), related = rows.filter(row => row.aggregateType === "ReservationReturn" && row.aggregateId === returnId);
+      const existing = related.find(row => row.operationType === "RETURN_COMPLETE"); if (existing) { await transactionDone(tx); return existing; }
+      const dependencies = related.filter(row => row.operationType === "RETURN_ATTACHMENTS");
+      if (dependencies.length !== 1 || dependencies[0].deviceId !== deviceId || ["CONFLICT", "FAILED_PERMANENT"].includes(dependencies[0].status)) throw new Error("Inspeção e evidências devem ser preparadas antes da conclusão.");
+      const attachments = await requestResult(tx.objectStore(stores.attachments).index("operationId").getAll(dependencies[0].id) as IDBRequest<OfflineAttachment[]>);
+      const irregular = snapshot.draft.items.filter(item => item.condition && item.condition !== "GOOD");
+      if (irregular.some(item => !attachments.some(file => file.purpose === "RETURN_EVIDENCE" && file.returnItemId === item.returnItemId))) throw new Error("Toda irregularidade exige evidência local.");
+      const now = new Date().toISOString(), id = crypto.randomUUID();
+      const operation: OfflineOperation = { id, clientOperationId: id, tenantId, userId, deviceId, operationType: "RETURN_COMPLETE", aggregateType: "ReservationReturn", aggregateId: returnId, expectedVersion: snapshot.expectedVersion + 1, payload: { description: "Concluir devolução" }, dependsOnOperationIds: [dependencies[0].id], status: "PENDING", attemptCount: 0, createdAt: now, updatedAt: now, schemaVersion: 1 };
+      operationStore.add(operation); await transactionDone(tx); return operation;
+    } finally { db.close(); }
+  },
+  async cleanupReturnAfterFullAck(returnId: string, tenantId: string, userId: string) {
+    const db = await openDatabase();
+    try {
+      const tx = db.transaction([stores.returns, stores.operations, stores.attachments], "readwrite"), ops = tx.objectStore(stores.operations), files = tx.objectStore(stores.attachments);
+      const rows = await requestResult(ops.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>), related = rows.filter(row => row.aggregateType === "ReservationReturn" && row.aggregateId === returnId);
+      if (!related.length) { await transactionDone(tx); return false; }
+      const completion = related.find(row => row.operationType === "RETURN_COMPLETE");
+      if (!completion || completion.status !== "SYNCED" || !completion.fullAck || completion.serverResultId !== returnId) throw new Error("FULL ACK ausente: dados locais preservados.");
+      const dependencies = related.filter(row => row.operationType === "RETURN_ATTACHMENTS");
+      if (dependencies.length !== 1 || dependencies[0].status !== "SYNCED" || !completion.dependsOnOperationIds.includes(dependencies[0].id)) throw new Error("Dependências sem confirmação.");
+      for (const row of dependencies) { const attached = await requestResult(files.index("operationId").getAll(row.id) as IDBRequest<OfflineAttachment[]>); if (attached.some(item => item.status !== "SERVER_CONFIRMED")) throw new Error("Evidências sem ACK."); for (const item of attached) files.delete(item.id); }
+      for (const row of related) ops.delete(row.id); tx.objectStore(stores.returns).delete([tenantId, userId, returnId]); await transactionDone(tx); return true;
     } finally { db.close(); }
   },
   async deviceId() {
@@ -224,7 +293,7 @@ export const offlineStore = {
     try {
       const tx = db.transaction(stores.operations, "readwrite"), store = tx.objectStore(stores.operations);
       const rows = await requestResult(store.index("owner").getAll([tenantId, userId]) as IDBRequest<OfflineOperation[]>);
-      for (const row of rows) if (row.operationType !== "PICKUP_COMPLETE" && row.dependsOnOperationIds.includes(completedId)) store.put({ ...row, dependsOnOperationIds: row.dependsOnOperationIds.filter(id => id !== completedId) });
+      for (const row of rows) if (!["PICKUP_COMPLETE", "RETURN_COMPLETE"].includes(row.operationType) && row.dependsOnOperationIds.includes(completedId)) store.put({ ...row, dependsOnOperationIds: row.dependsOnOperationIds.filter(id => id !== completedId) });
       await transactionDone(tx);
     } finally { db.close(); }
   },

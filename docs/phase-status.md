@@ -81,3 +81,9 @@ O motor OfflineAttachment agora transporta `PICKUP_EVIDENCE` até `OperationalEv
 `PICKUP_COMPLETE` persiste uma intenção local com dependências. A sincronização envia inspeção, evidências e assinatura/aceite antes da conclusão; o servidor revalida os receipts, a reserva, o checklist, o aceite, os recursos e a versão do Pickup. O mesmo `completePickup()` do fluxo online faz a transição e grava o receipt idempotente com FULL ACK na transação PostgreSQL. Retry após resposta perdida recupera o ACK sem duplicar custódia. O IndexedDB remove rascunho, operações e Blobs de foto/assinatura somente após FULL ACK, em uma transação. Consulte [ADR-038](adr/038-offline-pickup-completion-custody-full-ack.md).
 
 **Fase 10.3 permanece PARCIAL:** implementação funcional concluída, porém testes em navegador/PWA e dispositivo real ainda pendentes. **Fase 10 geral permanece PARCIAL.** Fase 7.1 continua PARCIAL pela homologação externa Zenvia/Resend. Return e OTP offline não foram implementados.
+
+### Fase 10.4 — Devolução offline funcional; homologação PWA pendente
+
+Snapshots e rascunhos de Return, inspeção integral, presença, condições e evidências são persistidos no IndexedDB. A sincronização usa versionamento otimista, receipts e o mesmo `completeReturn()` do fluxo online. Somente a transação PostgreSQL conclui Return/Reservation, reentra custódia, aplica disposition e cria MaintenanceOrder. FULL ACK governa a limpeza local e retry após resposta perdida não duplica custódia ou manutenção. Consulte [ADR-039](adr/039-offline-return-custody-maintenance.md).
+
+**Fase 10.4 permanece PARCIAL:** implementação funcional concluída, homologação Chrome/Edge/PWA/dispositivo real pendente. Fase 10 geral permanece PARCIAL e Fase 7.1 segue PARCIAL pela homologação externa.
