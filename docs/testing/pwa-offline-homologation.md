@@ -47,3 +47,28 @@ Ambiente automatizado real: Windows, Microsoft Edge Chromium headless, `http://1
 ## Resultado
 
 A infraestrutura PWA foi comprovada em Edge real, mas os gates de instalação, close/reopen da aplicação instalada, modo avião físico, touch, câmera e fluxos operacionais completos em dispositivo permanecem pendentes. Portanto Fase 10.5 e Fase 10 continuam PARCIAIS.
+
+## Android físico — Fase 10.5.1
+
+Sessão preparada em 2026-09-24 sobre o commit-base `926a3eb84ba3cd5cfb04e07f93ced1194c25c6f7`.
+
+Ambiente detectado: nenhum dispositivo Android conectado; `adb`, `cloudflared` e `ngrok` não estão instalados. A aplicação permanece disponível apenas em `localhost`, que não é acessível pelo smartphone. Não foi criado túnel público nem instalado certificado inseguro.
+
+| Cenário Android físico | Resultado | Evidência/observação |
+|---|---|---|
+| URL HTTPS controlada | NÃO EXECUTADO | Exposição segura ainda não autorizada/configurada |
+| Instalação PWA | NÃO EXECUTADO | Requer smartphone e URL HTTPS |
+| Standalone e reinício | NÃO EXECUTADO | Requer PWA instalada |
+| Service Worker / IndexedDB v4 | NÃO EXECUTADO | Edge desktop não substitui Android |
+| Modo avião e offline reopen | NÃO EXECUTADO | Gate físico obrigatório |
+| Touch, assinatura e orientação | NÃO EXECUTADO | Nenhum aparelho conectado |
+| Câmera e Blob real | NÃO EXECUTADO | Nenhum aparelho conectado |
+| Maintenance offline | NÃO EXECUTADO | Aguardando dados e aparelho de homologação |
+| Pickup offline / FULL ACK / cleanup | NÃO EXECUTADO | Aguardando dados e aparelho de homologação |
+| Return GOOD | NÃO EXECUTADO | Aguardando dados e aparelho de homologação |
+| Return DAMAGED / MaintenanceOrder | NÃO EXECUTADO | Aguardando dados e aparelho de homologação |
+| Interrupção de rede / 401 | NÃO EXECUTADO | Aguardando aparelho e sessão controlada |
+| Isolamento user/tenant | NÃO EXECUTADO | Aguardando contas/tenant de homologação |
+| PWA-105-002 no aparelho | NÃO EXECUTADO | Severidade permanece MEDIUM até teste físico |
+
+Status: **FASE 10.5.1 PARCIAL — dispositivo Android e origem HTTPS pendentes.** Nenhum gate físico foi aprovado por inferência.

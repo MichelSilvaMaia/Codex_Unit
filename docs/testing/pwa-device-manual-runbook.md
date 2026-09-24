@@ -2,6 +2,20 @@
 
 Preencha em cada teste: **Resultado: PASSOU / FALHOU** e **Observação/evidência:** screenshot, horário, dispositivo e comportamento observado. Use dados de homologação, nunca produção.
 
+## Registro da sessão Android
+
+- Fabricante/modelo: ____
+- Android: ____
+- Chrome: ____
+- RAM / armazenamento disponível: ____
+- Rede Wi-Fi de homologação: ____
+- URL HTTPS: ____
+- Data/hora: ____
+- Usuário e tenant de homologação: ____
+- PWA instalada: SIM / NÃO
+
+Pré-check antes de iniciar: o telefone e o computador devem acessar a URL HTTPS; PostgreSQL e portas administrativas não podem estar expostos. `localhost:3000` no Android aponta para o próprio telefone e não deve ser usado.
+
 ## A. Instalação
 
 ### A1 — Instalar e abrir standalone

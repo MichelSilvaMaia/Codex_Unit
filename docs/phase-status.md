@@ -93,3 +93,7 @@ Snapshots e rascunhos de Return, inspeção integral, presença, condições e e
 Microsoft Edge real confirmou Manifest, Service Worker ativado/controlando a página, Cache Storage restrito ao shell, IndexedDB `codex-unit-offline` v4, quota, detecção offline e renderização sem overflow do documento em desktop, tablet e mobile. A navegação superior usa rolagem horizontal em telas estreitas (PWA-105-002, MEDIUM). Consulte [matriz de homologação](testing/pwa-offline-homologation.md) e [runbook de dispositivo](testing/pwa-device-manual-runbook.md).
 
 **Fase 10.5 e Fase 10 permanecem PARCIAIS:** instalação/standalone, close/reopen da PWA instalada, modo avião físico, touch, câmera e execução operacional completa de Maintenance/Pickup/Return em dispositivo real ainda não foram comprovados. Fase 7.1 permanece PARCIAL pela homologação externa Zenvia/Resend.
+
+### Fase 10.5.1 — PARCIAL: Android físico não conectado
+
+O protocolo físico foi preparado e incorporado à matriz/runbook. O ambiente não possui smartphone conectado, ADB ou túnel HTTPS instalado; a aplicação continua apenas em localhost. Nenhum resultado Android foi inferido. Instalação, standalone, modo avião, offline reopen, câmera, touch, assinatura e os fluxos Maintenance/Pickup/Return permanecem `NÃO EXECUTADO` até disponibilização de aparelho e origem HTTPS controlada. Fases 10.5 e 10 continuam PARCIAIS; Fase 7.1 permanece PARCIAL.
